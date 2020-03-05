@@ -113,8 +113,8 @@ class Agent:
         action_onehot[action] = 1
         X = [np.expand_dims(st, 0) for st in state]
         Y = np.expand_dims(action_onehot, 0)
-        self.model.compile(optimizer=optim.Adam(lr=self.learning_rate),
-                           loss=custom_ce_loss(reward))
+        # self.model.compile(optimizer=optim.Adam(lr=self.learning_rate),
+        #                    loss=custom_ce_loss(reward))
         self.last_loss = np.mean(self.train_fn([X, Y, reward]))
 
     def memorize(self, state, action, prob, reward):
