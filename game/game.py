@@ -72,14 +72,18 @@ class Game:
         if receiver_action == correct_pos:
             #self.sender.reward_send(self.reward["sender_success"])
             #self.receiver.reward_receive(self.reward["receiver_success"])
-            self.sender.reinforce(sender_state, sender_action, sender_prob, self.reward["sender_success"])
-            self.receiver.reinforce(receiver_state, receiver_action, receiver_prob, self.reward["receiver_success"])
+            # self.sender.reinforce(sender_state, sender_action, sender_prob, self.reward["sender_success"])
+            # self.receiver.reinforce(receiver_state, receiver_action, receiver_prob, self.reward["receiver_success"])
+            self.sender.fit(sender_state, sender_action, self.reward["sender_success"])
+            self.receiver.fit(receiver_state, receiver_action, self.reward["receiver_success"])
             log.debug("Correct")
             is_success = True
         else:
             # self.sender.reward_send(self.reward["sender_fail"])
-            self.sender.reinforce(sender_state, sender_action, sender_prob, self.reward["sender_fail"])
-            self.receiver.reinforce(receiver_state, receiver_action, receiver_prob, self.reward["receiver_fail"])
+            # self.sender.reinforce(sender_state, sender_action, sender_prob, self.reward["sender_fail"])
+            # self.receiver.reinforce(receiver_state, receiver_action, receiver_prob, self.reward["receiver_fail"])
+            self.sender.fit(sender_state, sender_action, self.reward["sender_fail"])
+            self.receiver.fit(receiver_state, receiver_action, self.reward["receiver_fail"])
             log.debug("Wrong")
             is_success = False
         log.info(f"Turn {self.episode} finished: {'SUCCESS' if is_success else 'FAIL'}.")
