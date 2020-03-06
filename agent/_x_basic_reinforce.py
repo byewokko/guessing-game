@@ -5,6 +5,7 @@ from keras.models import Model
 import keras.layers as layers
 import keras.optimizers as optim
 import keras.backend as K
+import keras.initializers as init
 from keras.losses import categorical_crossentropy
 
 
@@ -26,6 +27,7 @@ def neg_categorical_crossentropy(y_true, y_pred, from_logits=False, label_smooth
 def custom_ce_loss(reward):
     def custom_loss(y_true, y_pred):
         return -K.mean(reward * y_true * K.log(y_pred), axis=1)
+
     return custom_loss
 
 
@@ -70,7 +72,7 @@ class Agent:
         self.model = None
         # self.expl_rate = False
         # self.expl_rate_decay = 0.95
-        self.learning_rate = 0.005
+        self.learning_rate = 0.001
 
     def _build_model(self, **kwargs):
         raise NotImplementedError
@@ -183,14 +185,23 @@ class Sender(Agent):
     def _build_model(self, img_shape, n_symbols, embedding_size, temperature=10, **kwargs):
         img_input_0 = layers.Input(shape=img_shape, name='image_0')
         img_input_1 = layers.Input(shape=img_shape, name='image_1')
-        img_emb_0 = layers.Dense(embedding_size, activation='sigmoid')
-        img_emb_1 = layers.Dense(embedding_size, activation='sigmoid')
+        img_emb_0 = layers.Dense(embedding_size,
+                                 activation='sigmoid',
+                                 use_bias=False,
+                                 kernel_initializer=init.glorot_uniform(seed=42))
+        img_emb_1 = layers.Dense(embedding_size,
+                                 activation='sigmoid',
+                                 use_bias=False,
+                                 kernel_initializer=init.glorot_uniform(seed=42))
 
         img_0 = img_emb_0(img_input_0)
-        img_1 = img_emb_1(img_input_1)
+        img_1 = img_emb_0(img_input_1)
 
         concat = layers.concatenate([img_0, img_1], axis=-1)
-        out = layers.Dense(n_symbols)(concat)
+        out = layers.Dense(n_symbols,
+                           activation='linear',
+                           use_bias=False,
+                           kernel_initializer=init.glorot_uniform(seed=42))(concat)
 
         temp = layers.Lambda(lambda x: x / temperature)
         soft = layers.Activation("softmax")
@@ -215,11 +226,17 @@ class Receiver(Agent):
     def _build_model(self, img_shape, n_symbols, embedding_size, temperature=10, **kwargs):
         img_input_0 = layers.Input(shape=img_shape, name='image_0')
         img_input_1 = layers.Input(shape=img_shape, name='image_1')
-        img_emb_0 = layers.Dense(embedding_size, activation='linear')
-        img_emb_1 = layers.Dense(embedding_size, activation='linear')
+        img_emb_0 = layers.Dense(embedding_size,
+                                 activation='linear',
+                                 use_bias=False,
+                                 kernel_initializer=init.glorot_uniform(seed=42))
+        img_emb_1 = layers.Dense(embedding_size,
+                                 activation='linear',
+                                 use_bias=False,
+                                 kernel_initializer=init.glorot_uniform(seed=42))
 
         img_0 = img_emb_0(img_input_0)
-        img_1 = img_emb_1(img_input_1)
+        img_1 = img_emb_0(img_input_1)
 
         sym_input = layers.Input(shape=(1,), dtype="int32", name="symbol")
         embed = layers.Embedding(input_dim=n_symbols, output_dim=embedding_size)
@@ -242,4 +259,3 @@ class Receiver(Agent):
 
     def _build_train_fn(self):
         super()._build_train_fn()
-

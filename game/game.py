@@ -2,10 +2,10 @@ import numpy as np
 import logging
 
 REWARD = {
-    "sender_success": 1,
-    "receiver_success": 1,
-    "sender_fail": 0,
-    "receiver_fail": 0
+    "sender_success": np.asarray([1]),
+    "receiver_success": np.asarray([1]),
+    "sender_fail": np.asarray([0]),
+    "receiver_fail": np.asarray([0])
 }
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -64,7 +64,7 @@ class Game:
             receiver_images = self.images[sample_ids]
         correct_pos = np.where(sample_ids == correct_id)[0]
         log.debug("Receiving... ")
-        receiver_state = [sender_action, *receiver_images]
+        receiver_state = [*receiver_images, sender_action]
         receiver_action, receiver_prob = self.receiver.act(receiver_state)
         log.debug(f"Guess: {sample_ids[receiver_action]} at p{receiver_action}. Correct is {correct_id} at p{correct_pos}.")
 
