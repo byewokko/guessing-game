@@ -2,10 +2,8 @@ import numpy as np
 import logging
 
 REWARD = {
-    "sender_success": np.asarray([1]),
-    "receiver_success": np.asarray([1]),
-    "sender_fail": np.asarray([0]),
-    "receiver_fail": np.asarray([0])
+    "success": 1,
+    "fail": 0
 }
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -14,12 +12,20 @@ log.setLevel(logging.DEBUG)
 log.propagate = True
 
 
+def np_reward(reward):
+    if reward:
+        return {k: np.asarray([v]) for k, v in reward.items()}
+    return None
+
+
 class Game:
 
     image_dict: dict
     reward: dict
 
-    def __init__(self, images, images_filenames=None, images_framed=None, sender=None, receiver=None, reward=None):
+    def __init__(self, images, images_filenames=None, images_framed=None,
+                 sender=None, receiver=None,
+                 reward=None, reward_sender=None, reward_receiver=None):
         self.images = images
         self.images_filenames = images_filenames
         self.images_framed = images_framed
@@ -27,7 +33,9 @@ class Game:
         self.image_ids = np.arange(len(self.images))
         self.sender = sender
         self.receiver = receiver
-        self.reward = reward or REWARD
+        self.reward = np_reward(reward) or np_reward(REWARD)
+        self.reward_sender = np_reward(reward_sender) or self.reward
+        self.reward_receiver = np_reward(reward_receiver) or self.reward
         self.episode = 0
 
     def take_turn(self, n_images=2):
@@ -74,16 +82,16 @@ class Game:
             #self.receiver.reward_receive(self.reward["receiver_success"])
             # self.sender.reinforce(sender_state, sender_action, sender_prob, self.reward["sender_success"])
             # self.receiver.reinforce(receiver_state, receiver_action, receiver_prob, self.reward["receiver_success"])
-            self.sender.fit(sender_state, sender_action, self.reward["sender_success"])
-            self.receiver.fit(receiver_state, receiver_action, self.reward["receiver_success"])
+            self.sender.fit(sender_state, sender_action, self.reward_sender["success"])
+            self.receiver.fit(receiver_state, receiver_action, self.reward_receiver["success"])
             log.debug("Correct")
             is_success = True
         else:
             # self.sender.reward_send(self.reward["sender_fail"])
             # self.sender.reinforce(sender_state, sender_action, sender_prob, self.reward["sender_fail"])
             # self.receiver.reinforce(receiver_state, receiver_action, receiver_prob, self.reward["receiver_fail"])
-            self.sender.fit(sender_state, sender_action, self.reward["sender_fail"])
-            self.receiver.fit(receiver_state, receiver_action, self.reward["receiver_fail"])
+            self.sender.fit(sender_state, sender_action, self.reward_sender["fail"])
+            self.receiver.fit(receiver_state, receiver_action, self.reward_receiver["fail"])
             log.debug("Wrong")
             is_success = False
         log.info(f"Turn {self.episode} finished: {'SUCCESS' if is_success else 'FAIL'}.")

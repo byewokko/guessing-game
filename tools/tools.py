@@ -1,49 +1,69 @@
 import numpy as np
-import os
-from keras.preprocessing import image
-from keras.applications.resnet50 import preprocess_input, ResNet50
+import gzip
 
 
-def load_images(path, return_fnames=False):
-    images = []
-    fnames = os.listdir(path)
-    for fname in fnames:
-        img = image.load_img(os.path.join(path, fname), target_size=(224, 224))
-        x = image.img_to_array(img)
-        x = np.expand_dims(x, 0)
-        x = preprocess_input(x)
-        images.append(x)
-    if return_fnames:
-        return [os.path.join(path, fname) for fname in fnames], images
-    return images
-
-
-def embed_images(img_stack):
-    model = ResNet50(weights='imagenet')
-    img_out = []
-    for img in img_stack:
-        img_out.append(np.squeeze(model.predict(img)))
-    return np.stack(img_out)
-
-
-def save_emb(keys, values, filename):
+def save_emb(keys, values, filename, number_format=".6f"):
     assert len(keys) == len(values)
-    with open(filename, "w") as out:
-        for k, v in zip(keys, values):
-            print(k, " ".join([f"{n:5e}" for n in v]), file=out)
+    number_format = f"{{n:{number_format}}}"
+    out = gzip.open(filename, "wb")
+    for i, (k, v) in enumerate(zip(keys, values)):
+        if i and not i % 1000:
+            print(f"{i} items written ...", end="\r")
+        line = f"{k} " + " ".join([number_format.format(n=n) for n in v]) + "\n"
+        out.write(line.encode("ascii"))
+    print(f"DONE. {i+1} items written to {filename}.")
+    out.close()
 
 
-def load_emb(filename):
+def save_emb_gz(keys, values, filename, number_format=".6f"):
+    assert len(keys) == len(values)
+    number_format = f"{{n:{number_format}}}"
+    out = gzip.open(filename, "wb")
+    for i, (k, v) in enumerate(zip(keys, values)):
+        if i and not i % 1000:
+            print(f"{i} items written ...", end="\r")
+        line = f"{k} " + " ".join([number_format.format(n=n) for n in v]) + "\n"
+        out.write(line.encode("ascii"))
+    print(f"DONE. {i+1} items written to {filename}.")
+    out.close()
+
+
+def load_emb(filename, n_items=None, encoding="utf-8"):
     word2ind = {}
     ind2word = []
     embeddings = []
     with open(filename, "r", encoding="utf-8") as f:
         for line in f:
+            if n_items and len(ind2word) >= n_items:
+                break
+            if not len(ind2word) % 1000:
+                print(f"{len(ind2word)} items loaded ...", end="\r")
             word, *emb_str = line.strip().split()
             vector = np.asarray([float(s) for s in emb_str])
             word2ind[word] = len(word2ind)
             ind2word.append(word)
             embeddings.append(vector)
+        print(f"DONE. {len(ind2word)} items loaded from {filename}.")
+    return word2ind, ind2word, np.stack(embeddings)
+
+
+def load_emb_gz(filename, n_items=None):
+    word2ind = {}
+    ind2word = []
+    embeddings = []
+    f = gzip.open(filename, "rb")
+    for line in f:
+        if n_items and len(ind2word) >= n_items:
+            break
+        if not len(ind2word) % 1000:
+            print(f"{len(ind2word)} items loaded ...", end="\r")
+        word, *emb_str = line.decode("ascii").strip().split()
+        vector = np.asarray([float(s) for s in emb_str])
+        word2ind[word] = len(word2ind)
+        ind2word.append(word)
+        embeddings.append(vector)
+    f.close()
+    print(f"DONE. {len(ind2word)} items loaded from {filename}.")
     return word2ind, ind2word, np.stack(embeddings)
 
 

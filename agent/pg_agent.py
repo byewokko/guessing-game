@@ -20,7 +20,9 @@ def cosine_distance(vests):
 class Agent:
     input_type = "data"
 
-    def __init__(self, input_sizes, output_size, n_symbols, embedding_size=50, learning_rate=0.001, gibbs_temp=10,
+    def __init__(self, input_sizes, output_size, n_symbols,
+                 embedding_size=50, learning_rate=0.001, gibbs_temp=10,
+                 optimizer=optim.Adam, use_bias=True,
                  **kwargs):
         self.n_input_images = 2
         self.input_sizes = input_sizes
@@ -33,6 +35,8 @@ class Agent:
         self.predict_model = None
         self.learning_rate = learning_rate
         self.gibbs_temp = gibbs_temp
+        self.optimizer = optimizer
+        self.use_bias = use_bias
 
     def _build_model(self, **kwargs):
         raise NotImplementedError
@@ -71,25 +75,25 @@ class Sender(Agent):
                   for i in range(n_inputs)]
         embs = [layers.Dense(self.embedding_size,
                              activation='sigmoid',
-                             # use_bias=False,
+                             use_bias=self.use_bias,
                              kernel_initializer=init.glorot_uniform(seed=42),
                              # activity_regularizer=l2(0.001),
                              name=f"embed_{i}")
                 for i in range(n_inputs)]
 
         emb = layers.Dense(self.embedding_size,
-                           activation='linear',
-                           # use_bias=False,
+                           activation='sigmoid',
+                           use_bias=self.use_bias,
                            kernel_initializer=init.glorot_uniform(seed=42),
                            name=f"embed_img")
 
-        imgs = [embs[i](inputs[i]) for i in range(n_inputs)]
-        # imgs = [emb(inputs[i]) for i in range(n_inputs)]
+        imgs = [embs[i](inputs[i]) for i in range(n_inputs)]  # separate embedding layer for each image
+        # imgs = [emb(inputs[i]) for i in range(n_inputs)]  # same embedding layer for all images
 
         concat = layers.concatenate(imgs, axis=-1)
         out = layers.Dense(self.output_size,
                            activation='linear',
-                           # use_bias=False,
+                           use_bias=self.use_bias,
                            kernel_initializer=init.glorot_uniform(seed=42))(concat)
 
         temp = layers.Lambda(lambda x: x / self.gibbs_temp)
@@ -99,17 +103,20 @@ class Sender(Agent):
         reward = layers.Input((1,), name="reward")
 
         def custom_loss(y_true, y_pred):
-            log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
-            return K.mean(log_lik * reward, keepdims=True)
+            # log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
+            # return K.mean(log_lik * reward, keepdims=True)
+            log_lik = K.sum(K.log(y_pred) * y_true)
+            return log_lik * reward
 
         self.train_model = Model([*inputs, reward], out)
-        self.train_model.compile(loss=custom_loss, optimizer=optim.Adam(self.learning_rate))
+        self.train_model.compile(loss=custom_loss, optimizer=self.optimizer(self.learning_rate))
         self.predict_model = Model(inputs, out)
 
 
 class Receiver(Agent):
-    def __init__(self, **kwargs):
+    def __init__(self, mode="dot", **kwargs):
         super().__init__(**kwargs)
+        self.mode = mode
         self._build_model()
 
     def _build_model(self, **kwargs):
@@ -119,20 +126,20 @@ class Receiver(Agent):
                   for i in range(n_input_images)]
         embs = [layers.Dense(self.embedding_size,
                              activation='linear',
-                             # use_bias=False,
+                             use_bias=self.use_bias,
                              kernel_initializer=init.glorot_uniform(seed=42),
                              # activity_regularizer=l2(0.001),
                              name=f"embed_{i}")
                 for i in range(n_input_images)]
         emb = layers.Dense(self.embedding_size,
                            activation='linear',
-                           # use_bias=False,
+                           use_bias=self.use_bias,
                            kernel_initializer=init.glorot_uniform(seed=42),
                            # activity_regularizer=l2(0.001),
                            name=f"embed_img")
 
-        # imgs = [embs[i](inputs[i]) for i in range(n_input_images)]
-        imgs = [emb(inputs[i]) for i in range(n_input_images)]
+        # imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
+        imgs = [emb(inputs[i]) for i in range(n_input_images)]  # same embedding layer for all images
 
         symbol_shape = self.input_sizes[-1]
         sym_input = layers.Input(shape=symbol_shape, dtype="int32", name="input_sym")
@@ -142,10 +149,22 @@ class Receiver(Agent):
         flat = layers.Flatten()
         symbol = flat(emb_sym(sym_input))
 
-        dot = layers.Dot(axes=1)
-        dot_prods = [dot([img, symbol]) for img in imgs]
-        out = layers.concatenate(dot_prods, axis=-1)
-        #
+        if self.mode == "dot":
+            dot = layers.Dot(axes=1)
+            dot_prods = [dot([img, symbol]) for img in imgs]
+            out = layers.concatenate(dot_prods, axis=-1)
+        elif self.mode == "dense":
+            dense_join = layers.Dense(self.embedding_size,
+                                      activation="sigmoid",
+                                      kernel_initializer=init.glorot_uniform(seed=42),
+                                      name=f"dense_join")
+            dense_out = layers.Dense(self.output_size,
+                                     kernel_initializer=init.glorot_uniform(seed=42),
+                                     name=f"dense_out")
+            out = dense_out(dense_join(layers.concatenate([*imgs, symbol], axis=-1)))
+        else:
+            raise ValueError(f"'{self.mode}' is not a valid mode.")
+
         # cossim = layers.Lambda(cosine_distance, output_shape=(1,))
         # sims = [cossim([img, symbol]) for img in imgs]
         # out = layers.concatenate(sims, axis=-1)
@@ -157,9 +176,11 @@ class Receiver(Agent):
         reward = layers.Input((1,), name="reward")
 
         def custom_loss(y_true, y_pred):
-            log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
-            return K.mean(log_lik * reward, keepdims=True)
+            # log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
+            # return K.mean(log_lik * reward, keepdims=True)
+            log_lik = K.sum(K.log(y_pred) * y_true)
+            return log_lik * reward
 
         self.train_model = Model([*inputs, sym_input, reward], out)
-        self.train_model.compile(loss=custom_loss, optimizer=optim.Adam(self.learning_rate))
+        self.train_model.compile(loss=custom_loss, optimizer=self.optimizer(self.learning_rate))
         self.predict_model = Model([*inputs, sym_input], out)
