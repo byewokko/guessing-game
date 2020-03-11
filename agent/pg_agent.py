@@ -100,14 +100,20 @@ class Sender(Agent):
         soft = layers.Activation("softmax")
         predict_out = soft(temp(out))
         train_out = soft(out)
+        # train_out = out
 
         reward = layers.Input((1,), name="reward")
 
         def custom_loss(y_true, y_pred):
+            # Cross-entropy 1 (??)
             # log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
             # return K.mean(log_lik * reward, keepdims=True)
-            log_lik = K.sum(K.log(y_pred) * y_true)
-            return log_lik * reward
+
+            # Cross-entropy 2
+            return K.sum(K.log(y_pred) * y_true) * reward
+
+            # RMS loss
+            # return K.mean((K.square(y_pred - y_true))) * reward
 
         self.train_model = Model([*inputs, reward], train_out)
         self.train_model.compile(loss=custom_loss, optimizer=self.optimizer(self.learning_rate))
@@ -174,14 +180,20 @@ class Receiver(Agent):
         soft = layers.Activation("softmax")
         predict_out = soft(temp(out))
         train_out = soft(out)
+        # train_out = out
 
         reward = layers.Input((1,), name="reward")
 
         def custom_loss(y_true, y_pred):
+            # Cross-entropy 1 (??)
             # log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
             # return K.mean(log_lik * reward, keepdims=True)
-            log_lik = K.sum(K.log(y_pred) * y_true)
-            return log_lik * reward
+
+            # Cross-entropy 2
+            return K.sum(K.log(y_pred) * y_true) * reward
+
+            # RMS loss
+            # return K.mean((K.square(y_pred - y_true))) * reward
 
         self.train_model = Model([*inputs, sym_input, reward], train_out)
         self.train_model.compile(loss=custom_loss, optimizer=self.optimizer(self.learning_rate))
