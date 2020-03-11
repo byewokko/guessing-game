@@ -98,7 +98,8 @@ class Sender(Agent):
 
         temp = layers.Lambda(lambda x: x / self.gibbs_temp)
         soft = layers.Activation("softmax")
-        out = soft(temp(out))
+        predict_out = soft(temp(out))
+        train_out = soft(out)
 
         reward = layers.Input((1,), name="reward")
 
@@ -108,9 +109,9 @@ class Sender(Agent):
             log_lik = K.sum(K.log(y_pred) * y_true)
             return log_lik * reward
 
-        self.train_model = Model([*inputs, reward], out)
+        self.train_model = Model([*inputs, reward], train_out)
         self.train_model.compile(loss=custom_loss, optimizer=self.optimizer(self.learning_rate))
-        self.predict_model = Model(inputs, out)
+        self.predict_model = Model(inputs, predict_out)
 
 
 class Receiver(Agent):
@@ -171,7 +172,8 @@ class Receiver(Agent):
         # p = print_layer(out, "rec 1")
         temp = layers.Lambda(lambda x: x / self.gibbs_temp)
         soft = layers.Activation("softmax")
-        out = soft(temp(out))
+        predict_out = soft(temp(out))
+        train_out = soft(out)
 
         reward = layers.Input((1,), name="reward")
 
@@ -181,6 +183,6 @@ class Receiver(Agent):
             log_lik = K.sum(K.log(y_pred) * y_true)
             return log_lik * reward
 
-        self.train_model = Model([*inputs, sym_input, reward], out)
+        self.train_model = Model([*inputs, sym_input, reward], train_out)
         self.train_model.compile(loss=custom_loss, optimizer=self.optimizer(self.learning_rate))
-        self.predict_model = Model([*inputs, sym_input], out)
+        self.predict_model = Model([*inputs, sym_input], predict_out)

@@ -8,8 +8,8 @@ import os
 from keras.preprocessing import image
 # from keras.applications.resnet50 import preprocess_input, ResNet50
 # from keras.applications.resnet_v2 import preprocess_input, ResNet50V2
-from keras.applications.xception import preprocess_input, Xception
-# from keras.applications.vgg19 import preprocess_input, VGG19
+# from keras.applications.xception import preprocess_input, Xception
+from keras.applications.vgg19 import preprocess_input, VGG19
 
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -19,17 +19,15 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 logging.basicConfig(level=logging.DEBUG)
 
-#IMG_PATH = "data/img/"
-IMG_PATH = "D:\\Pracant\\Desktop\\ESPGame100k\\originals"
-# IMG_SHAPE = (224, 224, 3)
-IMG_SHAPE = (299, 299, 3)  # for Xception
-OUT_NAME = "data\\espgame-xception.txt"
+IMG_PATH = "D:/Pracant/Desktop/ESPGame100k/originals"
+IMG_SHAPE = (224, 224, 3)
+# IMG_SHAPE = (299, 299, 3)  # for Xception
+OUT_NAME = "data/espgame-vgg19.emb"
 OUT_DIM = 50
 BATCH_SIZE = 16
 
-
-# model = ResNet50(weights='imagenet')
-model = Xception(weights='imagenet')
+model = VGG19(weights='imagenet')
+# model = Xception(weights='imagenet')
 log.info("model loaded")
 
 fnames = os.listdir(IMG_PATH)
