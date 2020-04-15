@@ -4,6 +4,7 @@ os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 import logging
+import numpy as np
 import game.game as game
 import agent.pg_agent as agent
 from tools.tools import load_emb_gz
@@ -76,18 +77,25 @@ success_rate_avg = 0.5
 sendr_loss_avg = None
 recvr_loss_avg = None
 for i in range(10000):
-    success = g.take_turn()
+    g.reset()
+    sender_sar, receiver_sar = g.play(sender=sender, receiver=receiver)
+    sender.remember(*sender_sar)
+    receiver.remember(*receiver_sar)
 
-    # PLOT PROGRESS
-    if not i % 50:
+    # TRAIN
+    if i and not i % BATCH_SIZE:
+        avg_success = (np.stack(receiver.batch_rewards)).mean()
+        sender.batch_train()
+        receiver.batch_train()
+        # PLOT PROGRESS
         t.append(i)
-        success_rate_avg = smooth_avg(success_rate_avg, success, 0.1)
+        success_rate_avg = smooth_avg(success_rate_avg, avg_success, 0.1)
         sendr_loss_avg = smooth_avg(sendr_loss_avg, sender.last_loss, 0.1)
         recvr_loss_avg = smooth_avg(recvr_loss_avg, receiver.last_loss, 0.1)
         success_rate.append(success_rate_avg)
         sendr_loss.append(sendr_loss_avg)
         recvr_loss.append(recvr_loss_avg)
-#     print(success, sender.last_loss, receiver.last_loss)
+#       print(success, sender.last_loss, receiver.last_loss)
         ax1.clear()
         ax2.clear()
         ax3.clear()

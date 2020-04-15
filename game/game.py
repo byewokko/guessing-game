@@ -91,6 +91,46 @@ class Game:
         self.episode += 1
         return is_success
 
+    def play(self, sender, receiver, n_images=2):
+        log.debug("Turn started")
+
+        # Sender phase
+        sample_ids = np.random.choice(a=self.image_ids, size=n_images, replace=False)
+        correct_pos = 0
+        correct_id = sample_ids[correct_pos]
+        log.debug(f"Picked images {sample_ids}. Correct {correct_id}.")
+        sender_state = self.images[sample_ids]
+
+        log.debug("Sending... ")
+        sender_action, sender_prob = sender.act(sender_state)
+        log.debug(f"Clue: {sender_action}")
+
+        # Receiver phase
+        np.random.shuffle(sample_ids)
+        receiver_images = self.images[sample_ids]
+        correct_pos = np.where(sample_ids == correct_id)[0]
+        log.debug("Receiving... ")
+        receiver_state = [*receiver_images, sender_action]
+        receiver_action, receiver_prob = receiver.act(receiver_state)
+        log.debug(
+            f"Guess: {sample_ids[receiver_action]} at p{receiver_action}. Correct is {correct_id} at p{correct_pos}.")
+
+        # Evaluate and reward
+        if receiver_action == correct_pos:
+            sender_sar = (sender_state, sender_action, self.reward_sender["success"])
+            receiver_sar = (receiver_state, receiver_action, self.reward_receiver["success"])
+            is_success = True
+        else:
+            sender_sar = (sender_state, sender_action, self.reward_sender["fail"])
+            receiver_sar = (receiver_state, receiver_action, self.reward_receiver["fail"])
+            is_success = False
+        log.info(f"Turn {self.episode} finished: {'SUCCESS' if is_success else 'FAIL'}.")
+        self.episode += 1
+        return sender_sar, receiver_sar
+
+    def reset(self):
+        pass
+
     def switch_roles(self):
         tmp = self.sender
         self.sender = self.receiver

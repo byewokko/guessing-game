@@ -10,11 +10,11 @@ from keras.regularizers import l2
 from tools.debug import print_layer
 
 
-def cosine_distance(vests):
-    x, y = vests
+def cosine_distance(stack):
+    x, y = stack
     x = K.l2_normalize(x, axis=-1)
     y = K.l2_normalize(y, axis=-1)
-    return K.mean(x * y, axis=-1, keepdims=True)
+    return K.dot(x, y)
 
 
 class Agent:
@@ -24,6 +24,7 @@ class Agent:
                  embedding_size=50, learning_rate=0.001, gibbs_temp=10,
                  optimizer=optim.Adam, use_bias=True,
                  **kwargs):
+        self.last_updates = None
         self.n_input_images = 2
         self.input_sizes = input_sizes
         self.embedding_size = embedding_size
@@ -31,12 +32,17 @@ class Agent:
         self.n_symbols = n_symbols
         self.last_action = None
         self.last_loss = 0
+        self.last_weights = None
         self.train_model = None
         self.predict_model = None
         self.learning_rate = learning_rate
         self.gibbs_temp = gibbs_temp
-        self.optimizer = optimizer
+        self.optimizer = optimizer(self.learning_rate, clipnorm=1.)
         self.use_bias = use_bias
+        self.batch_states = None
+        self.batch_actions = None
+        self.batch_rewards = None
+        self.reset_batch()
 
     def _build_model(self, **kwargs):
         raise NotImplementedError
@@ -50,11 +56,33 @@ class Agent:
         return action, act_probs
 
     def fit(self, state, action, reward):
+        self.last_weights = self.train_model.get_weights()
         action_onehot = np.zeros([self.output_size])
         action_onehot[action] = 1
         X = [np.expand_dims(st, 0) for st in state]
         Y = np.expand_dims(action_onehot, 0)
         self.last_loss = self.train_model.train_on_batch([*X, reward], Y)
+        #self.last_updates = self.optimizer.get_updates() # needs args: loss and params
+
+    def remember(self, state, action, reward):
+        for i in range(len(state)):
+            self.batch_states[i].append(state[i])
+        action_onehot = np.zeros([self.output_size])
+        action_onehot[action] = 1
+        self.batch_actions.append(action_onehot)
+        self.batch_rewards.append(reward)
+
+    def batch_train(self):
+        self.last_loss = self.train_model.train_on_batch(
+            [np.stack(stack) for stack in [*self.batch_states, self.batch_rewards]],
+            np.stack(self.batch_actions)
+        )
+        self.reset_batch()
+
+    def reset_batch(self):
+        self.batch_states = [[] for _ in self.input_sizes]
+        self.batch_actions = []
+        self.batch_rewards = []
 
     def load(self, name):
         self.train_model.load_weights(name)
@@ -77,7 +105,7 @@ class Sender(Agent):
                              activation='sigmoid',
                              use_bias=self.use_bias,
                              kernel_initializer=init.glorot_uniform(seed=42),
-                             # activity_regularizer=l2(0.001),
+                             kernel_regularizer=l2(0.001),
                              name=f"embed_{i}")
                 for i in range(n_inputs)]
 
@@ -85,6 +113,7 @@ class Sender(Agent):
                            activation='sigmoid',
                            use_bias=self.use_bias,
                            kernel_initializer=init.glorot_uniform(seed=42),
+                           kernel_regularizer=l2(0.001),
                            name=f"embed_img")
 
         imgs = [embs[i](inputs[i]) for i in range(n_inputs)]  # separate embedding layer for each image
@@ -116,7 +145,7 @@ class Sender(Agent):
             # return K.mean((K.square(y_pred - y_true))) * reward
 
         self.train_model = Model([*inputs, reward], train_out)
-        self.train_model.compile(loss=custom_loss, optimizer=self.optimizer(self.learning_rate))
+        self.train_model.compile(loss=custom_loss, optimizer=self.optimizer)
         self.predict_model = Model(inputs, predict_out)
 
 
@@ -135,14 +164,14 @@ class Receiver(Agent):
                              activation='linear',
                              use_bias=self.use_bias,
                              kernel_initializer=init.glorot_uniform(seed=42),
-                             # activity_regularizer=l2(0.001),
+                             kernel_regularizer=l2(0.001),
                              name=f"embed_{i}")
                 for i in range(n_input_images)]
         emb = layers.Dense(self.embedding_size,
                            activation='linear',
                            use_bias=self.use_bias,
                            kernel_initializer=init.glorot_uniform(seed=42),
-                           # activity_regularizer=l2(0.001),
+                           kernel_regularizer=l2(0.001),
                            name=f"embed_img")
 
         # imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
@@ -159,6 +188,12 @@ class Receiver(Agent):
         if self.mode == "dot":
             dot = layers.Dot(axes=1)
             dot_prods = [dot([img, symbol]) for img in imgs]
+            out = layers.concatenate(dot_prods, axis=-1)
+        elif self.mode == "cosine":
+            # basically normalized dot product
+            norm = layers.Lambda(lambda v: K.l2_normalize(v))
+            dot = layers.Dot(axes=1)
+            dot_prods = [dot([norm(img), norm(symbol)]) for img in imgs]
             out = layers.concatenate(dot_prods, axis=-1)
         elif self.mode == "dense":
             dense_join = layers.Dense(self.embedding_size,
@@ -196,5 +231,5 @@ class Receiver(Agent):
             # return K.mean((K.square(y_pred - y_true))) * reward
 
         self.train_model = Model([*inputs, sym_input, reward], train_out)
-        self.train_model.compile(loss=custom_loss, optimizer=self.optimizer(self.learning_rate))
+        self.train_model.compile(loss=custom_loss, optimizer=self.optimizer)
         self.predict_model = Model([*inputs, sym_input], predict_out)
