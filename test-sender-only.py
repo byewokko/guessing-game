@@ -18,17 +18,11 @@ log.setLevel(logging.DEBUG)
 
 
 IMG_EMB_FILE = "data/vgg19-10000.emb.gz"
-N_SYMBOLS = 10
+N_SYMBOLS = 2
 N_CHOICES = 2
 EMB_SIZE = 50
-N_IMAGES = 500
+N_IMAGES = 10
 BATCH_SIZE = 30
-
-
-def smooth_avg(old, new, new_weight=1.):
-    if old is None:
-        return new
-    return (old + new * new_weight) / (1 + new_weight)
 
 
 _, fnames, embs = load_emb_gz(IMG_EMB_FILE, N_IMAGES)
@@ -41,7 +35,7 @@ sender = agent.Sender(input_sizes=[IMG_SHAPE, IMG_SHAPE],
                       embedding_size=50,
                       learning_rate=0.001,
                       gibbs_temp=10,
-                      use_bias=False,
+                      use_bias=True,
                       optimizer=Adam)
 # sender = agent.SenderInformed(input_sizes=[IMG_SHAPE, IMG_SHAPE],
 #                               output_size=N_SYMBOLS,
@@ -52,28 +46,14 @@ sender = agent.Sender(input_sizes=[IMG_SHAPE, IMG_SHAPE],
 #                               gibbs_temp=10,
 #                               use_bias=False,
 #                               optimizer=Adam)
-receiver = agent.Receiver(input_sizes=[IMG_SHAPE, IMG_SHAPE, (1,)],
-                          output_size=N_CHOICES,
-                          n_symbols=N_SYMBOLS,
-                          embedding_size=50,
-                          learning_rate=0.001,
-                          gibbs_temp=10,
-                          mode="dot",  # original with dot product output
-                          # mode="dense",  # dense layer + sigmoid instead
-                          # mode="cosine",  # cosine distance (= norm and dot)
-                          use_bias=False,
-                          optimizer=Adam)
 g = game.Game(images=embs,
               images_filenames=fnames,
-              sender=sender,
-              receiver=receiver,
               reward_sender={"success": 1, "fail": 0},
               reward_receiver={"success": 1, "fail": 0})
 
 fig = plt.figure()
-ax1 = fig.add_subplot(311)
-ax2 = fig.add_subplot(312)
-ax3 = fig.add_subplot(313)
+ax1 = fig.add_subplot(211)
+ax2 = fig.add_subplot(212)
 plt.ion()
 
 fig.show()
@@ -91,12 +71,20 @@ recvr_loss_avg = None
 for i in range(10000):
     g.reset()
     sender_state = g.get_sender_state(n_images=N_CHOICES)
+    sample_ids = g.get_sample_ids()
+    # This tests whether the sender is able to remember two arbitrary groups of images
+    if np.all(sample_ids > N_IMAGES/2) or np.all(sample_ids <= N_IMAGES/2):
+        correct_action = 0
+    else:
+        correct_action = 1
     sender_action, sender_prob = sender.act(sender_state)
-    receiver_state = g.get_receiver_state(sender_action)
-    receiver_action, receiver_prob = receiver.act(receiver_state)
-    sender_reward, receiver_reward, success = g.evaluate_guess(receiver_action)
+    if sender_action == correct_action:
+        success = True
+        sender_reward = 1
+    else:
+        success = False
+        sender_reward = 0
     sender.remember(sender_state, sender_action, sender_reward)
-    receiver.remember(receiver_state, receiver_action, receiver_reward)
     batch_success.append(success)
 
     # TRAIN
@@ -104,21 +92,13 @@ for i in range(10000):
         avg_success = sum(batch_success)/len(batch_success)
         batch_success = []
         sender.batch_train()
-        receiver.batch_train()
         # PLOT PROGRESS
         t.append(i)
-        success_rate_avg = smooth_avg(success_rate_avg, avg_success, 0.1)
-        sendr_loss_avg = smooth_avg(sendr_loss_avg, sender.last_loss, 0.1)
-        recvr_loss_avg = smooth_avg(recvr_loss_avg, receiver.last_loss, 0.1)
-        success_rate.append(success_rate_avg)
-        sendr_loss.append(sendr_loss_avg)
-        recvr_loss.append(recvr_loss_avg)
-        #       print(success, sender.last_loss, receiver.last_loss)
+        success_rate.append(avg_success)
+        sendr_loss.append(sender.last_loss)
         ax1.clear()
         ax2.clear()
-        ax3.clear()
         ax1.plot(t[-show_steps:], sendr_loss[-show_steps:], "g")
-        ax2.plot(t[-show_steps:], recvr_loss[-show_steps:], "c")
-        ax3.plot(t[-show_steps:], success_rate[-show_steps:], "r")
+        ax2.plot(t[-show_steps:], success_rate[-show_steps:], "r")
         fig.canvas.draw()
         fig.canvas.flush_events()

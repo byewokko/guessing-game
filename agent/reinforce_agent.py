@@ -50,6 +50,7 @@ class Agent:
     def act(self, state):
         state = [np.expand_dims(st, 0) for st in state]
         act_probs = self.predict_model.predict(state)
+        # act_probs = self.train_model.predict([*state, np.asarray([0])])
         act_probs = np.squeeze(act_probs)
         action = np.random.choice(range(self.output_size), 1, p=act_probs)
         self.last_action = (state, action, act_probs)
@@ -62,7 +63,7 @@ class Agent:
         X = [np.expand_dims(st, 0) for st in state]
         Y = np.expand_dims(action_onehot, 0)
         self.last_loss = self.train_model.train_on_batch([*X, reward], Y)
-        #self.last_updates = self.optimizer.get_updates() # needs args: loss and params
+        # self.last_updates = self.optimizer.get_updates() # needs args: loss and params
 
     def remember(self, state, action, reward):
         for i in range(len(state)):
@@ -94,7 +95,7 @@ class Agent:
 class Sender(Agent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._build_model()
+        self._build_model(**kwargs)
 
     def _build_model(self, **kwargs):
         n_inputs = len(self.input_sizes)
@@ -104,16 +105,16 @@ class Sender(Agent):
         embs = [layers.Dense(self.embedding_size,
                              activation='sigmoid',
                              use_bias=self.use_bias,
-                             kernel_initializer=init.glorot_uniform(seed=42),
-                             kernel_regularizer=l2(0.001),
+                             # kernel_initializer=init.glorot_uniform(seed=42),
+                             # kernel_regularizer=l2(0.001),
                              name=f"embed_{i}")
                 for i in range(n_inputs)]
 
         emb = layers.Dense(self.embedding_size,
                            activation='sigmoid',
                            use_bias=self.use_bias,
-                           kernel_initializer=init.glorot_uniform(seed=42),
-                           kernel_regularizer=l2(0.001),
+                           # kernel_initializer=init.glorot_uniform(seed=42),
+                           # kernel_regularizer=l2(0.001),
                            name=f"embed_img")
 
         imgs = [embs[i](inputs[i]) for i in range(n_inputs)]  # separate embedding layer for each image
@@ -123,13 +124,87 @@ class Sender(Agent):
         out = layers.Dense(self.output_size,
                            activation='linear',
                            use_bias=self.use_bias,
-                           kernel_initializer=init.glorot_uniform(seed=42))(concat)
+                           # kernel_initializer=init.glorot_uniform(seed=42)
+                           )(concat)
 
         temp = layers.Lambda(lambda x: x / self.gibbs_temp)
         soft = layers.Activation("softmax")
         predict_out = soft(temp(out))
         train_out = soft(out)
         # train_out = out
+
+        reward = layers.Input((1,), name="reward")
+
+        def custom_loss(y_true, y_pred):
+            # Cross-entropy 1 (??)
+            # log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
+            # return K.mean(log_lik * reward, keepdims=True)
+
+            # Cross-entropy 2
+            return K.sum(K.log(y_pred) * y_true) * reward
+
+            # RMS loss
+            # return K.mean((K.square(y_pred - y_true))) * reward
+
+        self.train_model = Model([*inputs, reward], train_out)
+        self.train_model.compile(loss=custom_loss, optimizer=self.optimizer)
+        self.predict_model = Model(inputs, predict_out)
+        # self.predict_model.compile(loss=custom_loss, optimizer=self.optimizer)
+
+
+class SenderInformed(Agent):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._build_model(**kwargs)
+
+    def _build_model(self, input_sizes, embedding_size, n_filters, output_size, use_bias=True, **kwargs):
+        n_inputs = len(self.input_sizes)
+        inputs = [layers.Input(shape=self.input_sizes[i],
+                               name=f"input_{i}")
+                  for i in range(n_inputs)]
+        embs = [layers.Dense(self.embedding_size,
+                             activation='sigmoid',
+                             use_bias=self.use_bias,
+                             # kernel_initializer=init.glorot_uniform(seed=42),
+                             # kernel_regularizer=l2(0.001),
+                             name=f"embed_{i}")
+                for i in range(n_inputs)]
+
+        emb = layers.Dense(self.embedding_size,
+                           activation='sigmoid',
+                           use_bias=self.use_bias,
+                           # kernel_initializer=init.glorot_uniform(seed=42),
+                           # kernel_regularizer=l2(0.001),
+                           name=f"embed_img")
+
+        imgs = [embs[i](inputs[i]) for i in range(n_inputs)]  # separate embedding layer for each image
+        # imgs = [emb(inputs[i]) for i in range(n_inputs)]  # same embedding layer for all images
+
+        stack = layers.Lambda(lambda x: K.stack(x, axis=1), name="stack")
+        reshape = layers.Reshape((-1, self.embedding_size, 1))
+        feat_filters = layers.Conv2D(filters=n_filters,
+                                     kernel_size=(2, 1),
+                                     activation="sigmoid",
+                                     # padding="same",
+                                     # strides=embedding_size,
+                                     # data_format="channels_last",
+                                     name="feature_filters"
+                                     )
+
+        voc_filter = layers.Conv2D(1, (1, n_filters),
+                                   # padding="same",
+                                   data_format="channels_first",
+                                   name="vocab_filter"
+                                   )
+
+        dense = layers.Dense(output_size, name="output_dense")
+
+        out = dense(layers.Flatten()(voc_filter(feat_filters(reshape(stack(imgs))))))
+
+        temp = layers.Lambda(lambda x: x / 10, name="gibbs_temp")
+        soft = layers.Activation("softmax", name="softmax")
+        predict_out = soft(temp(out))
+        train_out = soft(out)
 
         reward = layers.Input((1,), name="reward")
 
@@ -163,15 +238,15 @@ class Receiver(Agent):
         embs = [layers.Dense(self.embedding_size,
                              activation='linear',
                              use_bias=self.use_bias,
-                             kernel_initializer=init.glorot_uniform(seed=42),
-                             kernel_regularizer=l2(0.001),
+                             # kernel_initializer=init.glorot_uniform(seed=42),
+                             # kernel_regularizer=l2(0.001),
                              name=f"embed_{i}")
                 for i in range(n_input_images)]
         emb = layers.Dense(self.embedding_size,
                            activation='linear',
                            use_bias=self.use_bias,
-                           kernel_initializer=init.glorot_uniform(seed=42),
-                           kernel_regularizer=l2(0.001),
+                           # kernel_initializer=init.glorot_uniform(seed=42),
+                           # kernel_regularizer=l2(0.001),
                            name=f"embed_img")
 
         # imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
@@ -198,10 +273,10 @@ class Receiver(Agent):
         elif self.mode == "dense":
             dense_join = layers.Dense(self.embedding_size,
                                       activation="sigmoid",
-                                      kernel_initializer=init.glorot_uniform(seed=42),
+                                      # kernel_initializer=init.glorot_uniform(seed=42),
                                       name=f"dense_join")
             dense_out = layers.Dense(self.output_size,
-                                     kernel_initializer=init.glorot_uniform(seed=42),
+                                     # kernel_initializer=init.glorot_uniform(seed=42),
                                      name=f"dense_out")
             out = dense_out(dense_join(layers.concatenate([*imgs, symbol], axis=-1)))
         else:

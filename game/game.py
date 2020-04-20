@@ -30,13 +30,18 @@ class Game:
         self.images_filenames = images_filenames
         self.images_framed = images_framed
         self.use_frame = images_framed is not None
-        self.image_ids = np.arange(len(self.images))
+        self.image_ids = np.arange(len(self.images), dtype="int32")
         self.sender = sender
         self.receiver = receiver
         self.reward = np_reward(reward) or np_reward(REWARD)
         self.reward_sender = np_reward(reward_sender) or self.reward
         self.reward_receiver = np_reward(reward_receiver) or self.reward
         self.episode = 0
+
+        self.sample_ids = None
+        self.correct_pos_sender = None
+        self.correct_pos_receiver = None
+        self.correct_id = None
 
     def take_turn(self, n_images=2):
         log.debug("Turn started")
@@ -91,48 +96,50 @@ class Game:
         self.episode += 1
         return is_success
 
-    def play(self, sender, receiver, n_images=2):
-        log.debug("Turn started")
+    def get_sender_state(self, n_images=2):
+        self.sample_ids = np.random.choice(a=self.image_ids, size=n_images, replace=False)
+        self.correct_pos_sender = 0
+        self.correct_id = self.sample_ids[self.correct_pos_sender]
+        log.debug(f"Picked images {self.sample_ids}. Correct {self.correct_id}.")
+        sender_state = self.images[self.sample_ids]
 
-        # Sender phase
-        sample_ids = np.random.choice(a=self.image_ids, size=n_images, replace=False)
-        correct_pos = 0
-        correct_id = sample_ids[correct_pos]
-        log.debug(f"Picked images {sample_ids}. Correct {correct_id}.")
-        sender_state = self.images[sample_ids]
+        # Prepare receiver setup
+        np.random.shuffle(self.sample_ids)
+        receiver_images = self.images[self.sample_ids]
+        self.correct_pos_receiver = np.where(self.sample_ids == self.correct_id)[0]
 
-        log.debug("Sending... ")
-        sender_action, sender_prob = sender.act(sender_state)
-        log.debug(f"Clue: {sender_action}")
+        return sender_state
 
-        # Receiver phase
-        np.random.shuffle(sample_ids)
-        receiver_images = self.images[sample_ids]
-        correct_pos = np.where(sample_ids == correct_id)[0]
+    def get_receiver_state(self, sender_action):
+        receiver_images = self.images[self.sample_ids]
         log.debug("Receiving... ")
         receiver_state = [*receiver_images, sender_action]
-        receiver_action, receiver_prob = receiver.act(receiver_state)
-        log.debug(
-            f"Guess: {sample_ids[receiver_action]} at p{receiver_action}. Correct is {correct_id} at p{correct_pos}.")
+        return receiver_state
 
-        # Evaluate and reward
-        if receiver_action == correct_pos:
-            sender_sar = (sender_state, sender_action, self.reward_sender["success"])
-            receiver_sar = (receiver_state, receiver_action, self.reward_receiver["success"])
+    def evaluate_guess(self, receiver_action):
+        if np.all(receiver_action == self.correct_pos_receiver):
+            sender_r = self.reward_sender["success"]
+            receiver_r = self.reward_receiver["success"]
             is_success = True
         else:
-            sender_sar = (sender_state, sender_action, self.reward_sender["fail"])
-            receiver_sar = (receiver_state, receiver_action, self.reward_receiver["fail"])
+            sender_r = self.reward_sender["fail"]
+            receiver_r = self.reward_receiver["fail"]
             is_success = False
         log.info(f"Turn {self.episode} finished: {'SUCCESS' if is_success else 'FAIL'}.")
         self.episode += 1
-        return sender_sar, receiver_sar
+        return sender_r, receiver_r, is_success
 
     def reset(self):
-        pass
+        self.sample_ids = None
+        self.correct_pos_sender = None
+        self.correct_pos_receiver = None
+        self.correct_id = None
 
     def switch_roles(self):
         tmp = self.sender
         self.sender = self.receiver
         self.receiver = tmp
         log.debug(f"Roles switched")
+
+    def get_sample_ids(self):
+        return self.sample_ids

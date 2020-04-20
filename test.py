@@ -5,7 +5,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 import logging
 import game.game as game
-import agent.pg_agent as agent
+import agent.reinforce_agent as agent
 from tools.tools import load_emb_gz
 from keras.optimizers import Adam, SGD, Adagrad
 import matplotlib.pyplot as plt
