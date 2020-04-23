@@ -66,7 +66,6 @@ class Game:
             sample_ctgs = np.random.choice(a=self.categories, size=n_images, replace=False)
             for i in range(n_images):
                 self.sample_ids[i] = np.random.choice(self.categorized_images[sample_ctgs[i]], size=1)
-            print(sample_ctgs, self.sample_ids)
         else:
             self.sample_ids = np.random.choice(a=self.image_ids, size=n_images, replace=False)
         self.correct_pos_sender = 0
