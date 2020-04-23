@@ -103,26 +103,23 @@ class Sender(Agent):
                                name=f"input_{i}")
                   for i in range(n_inputs)]
         embs = [layers.Dense(self.embedding_size,
-                             activation='sigmoid',
+                             activation='relu',
                              use_bias=self.use_bias,
                              # kernel_initializer=init.glorot_uniform(seed=42),
                              # kernel_regularizer=l2(0.001),
                              name=f"embed_{i}")
                 for i in range(n_inputs)]
 
-        emb = layers.Dense(self.embedding_size,
-                           activation='sigmoid',
-                           use_bias=self.use_bias,
-                           # kernel_initializer=init.glorot_uniform(seed=42),
-                           # kernel_regularizer=l2(0.001),
-                           name=f"embed_img")
-
         imgs = [embs[i](inputs[i]) for i in range(n_inputs)]  # separate embedding layer for each image
-        # imgs = [emb(inputs[i]) for i in range(n_inputs)]  # same embedding layer for all images
 
         concat = layers.concatenate(imgs, axis=-1)
+        # hidden = layers.Dense(self.embedding_size,
+        #                    activation='relu',
+        #                    use_bias=self.use_bias,
+        #                    # kernel_initializer=init.glorot_uniform(seed=42)
+        #                    )(concat)
         out = layers.Dense(self.output_size,
-                           activation='linear',
+                           activation='sigmoid',
                            use_bias=self.use_bias,
                            # kernel_initializer=init.glorot_uniform(seed=42)
                            )(concat)
@@ -264,7 +261,6 @@ class Receiver(Agent):
             dot = layers.Dot(axes=1)
             dot_prods = [dot([img, symbol]) for img in imgs]
             out = layers.concatenate(dot_prods, axis=-1)
-            # out = layers.Activation("sigmoid")(out)
         elif self.mode == "cosine":
             # basically normalized dot product
             norm = layers.Lambda(lambda v: K.l2_normalize(v))

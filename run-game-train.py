@@ -7,8 +7,8 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 import logging
 import numpy as np
 import game.game as game
-import agent.reinforce_agent as agent
-from tools.tools import load_emb_gz
+import agent.test_agent as agent
+from utils.embeddings import load_emb_gz, make_categories
 from keras.optimizers import Adam, SGD, Adagrad
 import matplotlib.pyplot as plt
 
@@ -17,7 +17,8 @@ log.setLevel(logging.DEBUG)
 # tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 
-IMG_EMB_FILE = "data/vgg19-10000.emb.gz"
+IMG_EMB_FILE = "data/vgg19-imgnet.emb.gz"
+#IMG_EMB_FILE = "data/vgg19-10000.emb.gz"
 N_SYMBOLS = 10
 N_CHOICES = 2
 EMB_SIZE = 50
@@ -31,7 +32,8 @@ def smooth_avg(old, new, new_weight=1.):
     return (old + new * new_weight) / (1 + new_weight)
 
 
-_, fnames, embs = load_emb_gz(IMG_EMB_FILE, N_IMAGES)
+_, fnames, embs = load_emb_gz(IMG_EMB_FILE)#, N_IMAGES)
+categories = make_categories(fnames)
 IMG_SHAPE = embs[0].shape
 IMG_N = len(embs)
 
@@ -41,7 +43,7 @@ sender = agent.Sender(input_sizes=[IMG_SHAPE, IMG_SHAPE],
                       embedding_size=50,
                       learning_rate=0.001,
                       gibbs_temp=10,
-                      use_bias=False,
+                      use_bias=True,
                       optimizer=Adam)
 # sender = agent.SenderInformed(input_sizes=[IMG_SHAPE, IMG_SHAPE],
 #                               output_size=N_SYMBOLS,
@@ -61,12 +63,11 @@ receiver = agent.Receiver(input_sizes=[IMG_SHAPE, IMG_SHAPE, (1,)],
                           mode="dot",  # original with dot product output
                           # mode="dense",  # dense layer + sigmoid instead
                           # mode="cosine",  # cosine distance (= norm and dot)
-                          use_bias=False,
+                          use_bias=True,
                           optimizer=Adam)
 g = game.Game(images=embs,
               images_filenames=fnames,
-              sender=sender,
-              receiver=receiver,
+              categories=categories,
               reward_sender={"success": 1, "fail": 0},
               reward_receiver={"success": 1, "fail": 0})
 
@@ -90,7 +91,7 @@ sendr_loss_avg = None
 recvr_loss_avg = None
 for i in range(10000):
     g.reset()
-    sender_state = g.get_sender_state(n_images=N_CHOICES)
+    sender_state = g.get_sender_state(n_images=N_CHOICES, unique_categories=True)
     sender_action, sender_prob = sender.act(sender_state)
     receiver_state = g.get_receiver_state(sender_action)
     receiver_action, receiver_prob = receiver.act(receiver_state)
@@ -107,12 +108,12 @@ for i in range(10000):
         receiver.batch_train()
         # PLOT PROGRESS
         t.append(i)
-        success_rate_avg = smooth_avg(success_rate_avg, avg_success, 0.1)
-        sendr_loss_avg = smooth_avg(sendr_loss_avg, sender.last_loss, 0.1)
-        recvr_loss_avg = smooth_avg(recvr_loss_avg, receiver.last_loss, 0.1)
-        success_rate.append(success_rate_avg)
-        sendr_loss.append(sendr_loss_avg)
-        recvr_loss.append(recvr_loss_avg)
+        # success_rate_avg = smooth_avg(success_rate_avg, avg_success, 0.1)
+        # sendr_loss_avg = smooth_avg(sendr_loss_avg, sender.last_loss, 0.1)
+        # recvr_loss_avg = smooth_avg(recvr_loss_avg, receiver.last_loss, 0.1)
+        success_rate.append(avg_success)
+        sendr_loss.append(sender.last_loss)
+        recvr_loss.append(receiver.last_loss)
         #       print(success, sender.last_loss, receiver.last_loss)
         ax1.clear()
         ax2.clear()

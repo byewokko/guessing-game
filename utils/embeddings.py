@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import gzip
 
 
@@ -65,6 +66,12 @@ def load_emb_gz(filename, n_items=None):
     f.close()
     print(f"DONE. {len(ind2word)} items loaded from {filename}.")
     return word2ind, ind2word, np.stack(embeddings)
+
+
+def make_categories(filenames):
+    filenames_split = [f.split(os.path.sep)[-2] for f in filenames]
+    uniq, cat = np.unique(filenames_split, return_inverse=True)
+    return cat
 
 
 def reduce_emb(x, n_comp):

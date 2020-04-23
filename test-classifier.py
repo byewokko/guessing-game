@@ -12,6 +12,8 @@ import agent.test_agent as agent
 from utils.embeddings import load_emb_gz
 from keras.optimizers import Adam, SGD, Adagrad
 import matplotlib.pyplot as plt
+import keras.models as models
+import keras.layers as layers
 
 log = logging.getLogger("game")
 log.setLevel(logging.DEBUG)
@@ -22,7 +24,7 @@ IMG_EMB_FILE = "data/vgg19-10000.emb.gz"
 N_SYMBOLS = 2
 N_CHOICES = 2
 EMB_SIZE = 50
-N_IMAGES = 10
+N_IMAGES = 10000
 BATCH_SIZE = 30
 
 
@@ -30,6 +32,23 @@ _, fnames, embs = load_emb_gz(IMG_EMB_FILE, N_IMAGES)
 IMG_SHAPE = embs[0].shape
 IMG_N = len(embs)
 
+x = embs
+y = np.zeros((N_IMAGES, 1), dtype="int32")
+y[N_IMAGES//2:, :] = 1
+x_test = x[4700:5300]
+y_test = y[4700:5300]
+
+net = models.Sequential()
+net.add(layers.Dense(50, input_shape=IMG_SHAPE, activation="relu"))
+net.add(layers.Dense(50, input_shape=IMG_SHAPE, activation="relu"))
+net.add(layers.Dense(1, activation="sigmoid"))
+net.compile(loss="binary_crossentropy", optimizer="adam",
+              metrics=['accuracy'])
+
+net.fit(x, y, batch_size=10, epochs=20,
+          validation_data=(x_test, y_test))
+
+quit()
 sender = agent.Sender(input_sizes=[IMG_SHAPE, IMG_SHAPE],
                       output_size=N_SYMBOLS,
                       n_symbols=N_SYMBOLS,

@@ -14,6 +14,7 @@ gradient](https://towardsdatascience.com/policy-gradients-in-a-nutshell-8b72f974
         - single or separate embedding layers?
         - which optimizer? custom weight updates?
         - use biases?
+        - UPDATE: according to Alex P., hyperparameters don't matter
     - reuse this agent to play cartpole and debug
 - exploding weights -> NaN
     - some hyperparameter setting lead to exploding weights in the bottom (embedding) layers

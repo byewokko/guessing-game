@@ -19,10 +19,11 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 logging.basicConfig(level=logging.DEBUG)
 
-IMG_PATH = "D:/Pracant/Desktop/ESPGame100k/originals"
-IMG_SHAPE = (224, 224, 3)
+#IMG_PATH = "D:/Pracant/Desktop/ESPGame100k/originals"
+IMG_PATH = "F:/imagenet_images"
+IMG_SHAPE = (224, 224, 3)  # for VGG
 # IMG_SHAPE = (299, 299, 3)  # for Xception
-OUT_NAME = "data/espgame-vgg19.emb"
+OUT_NAME = "data/big/vgg19-imgnet.emb.gz"
 OUT_DIM = 50
 BATCH_SIZE = 16
 
@@ -30,7 +31,11 @@ model = VGG19(weights='imagenet')
 # model = Xception(weights='imagenet')
 log.info("model loaded")
 
-fnames = os.listdir(IMG_PATH)
+fnames = []
+for root, subs, files in os.walk(IMG_PATH):
+    for f in files:
+        if f.lower().endswith(".jpg"):
+            fnames.append(os.path.join(root, f))
 log.info(f"{len(fnames)} images to process")
 
 with open(OUT_NAME, "w") as out:
@@ -49,7 +54,7 @@ for i in range(0, len(fnames), BATCH_SIZE):
     output = model.predict(batch, batch_size=BATCH_SIZE)
     with open(OUT_NAME, "a") as out:
         for j in range(i, min(i + BATCH_SIZE, len(fnames))):
-            print(fnames[j], " ".join([f"{n:5e}" for n in output[j%BATCH_SIZE]]), file=out)
+            print(fnames[j].replace(" ", "\\ "), " ".join([f"{n:5e}" for n in output[j%BATCH_SIZE]]), file=out)
     log.info(f"{i+BATCH_SIZE} images completed")
 
 log.info("DONE")

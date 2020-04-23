@@ -23,81 +23,52 @@ class Game:
     image_dict: dict
     reward: dict
 
-    def __init__(self, images, images_filenames=None, images_framed=None,
-                 sender=None, receiver=None,
+    def __init__(self, images, categories=None, images_filenames=None, images_framed=None,
                  reward=None, reward_sender=None, reward_receiver=None):
         self.images = images
         self.images_filenames = images_filenames
         self.images_framed = images_framed
         self.use_frame = images_framed is not None
         self.image_ids = np.arange(len(self.images), dtype="int32")
-        self.sender = sender
-        self.receiver = receiver
         self.reward = np_reward(reward) or np_reward(REWARD)
         self.reward_sender = np_reward(reward_sender) or self.reward
         self.reward_receiver = np_reward(reward_receiver) or self.reward
         self.episode = 0
+
+        self.categories = None
+        if categories is not None:
+            self.categories = np.unique(categories)
+            self.categorized_images = {}
+            for c in self.categories:
+                idx = np.where(categories == c)
+                self.categorized_images[c] = self.image_ids[idx]
 
         self.sample_ids = None
         self.correct_pos_sender = None
         self.correct_pos_receiver = None
         self.correct_id = None
 
-    def take_turn(self, n_images=2):
-        log.debug("Turn started")
-
-        # Sender phase
-        sample_ids = np.random.choice(a=self.image_ids, size=n_images, replace=False)
-        if self.use_frame:
-            raise NotImplementedError()
-            correct_pos = np.random.randint(0, len(sample_ids))
-        else:
-            correct_pos = 0
-        correct_id = sample_ids[correct_pos]
-        log.debug(f"Picked images {sample_ids}. Correct {correct_id}.")
-
-        if self.sender.input_type and self.sender.input_type == "filename":
-            raise NotImplementedError()
-            sender_state = self.images_filenames[sample_ids]
-        else:  # "data"
-            sender_state = self.images[sample_ids]
-            if self.use_frame:
-                raise NotImplementedError()
-                sender_state[correct_pos] = self.images_framed[correct_id]
-
-        log.debug("Sending... ")
-        sender_action, sender_prob = self.sender.act(sender_state)
-        log.debug(f"Clue: {sender_action}")
-
-        # Receiver phase
-        np.random.shuffle(sample_ids)
-        if self.sender.input_type and self.sender.input_type == "filename":
-            receiver_images = self.images_filenames[sample_ids]
-        else:
-            receiver_images = self.images[sample_ids]
-        correct_pos = np.where(sample_ids == correct_id)[0]
-        log.debug("Receiving... ")
-        receiver_state = [*receiver_images, sender_action]
-        receiver_action, receiver_prob = self.receiver.act(receiver_state)
-        log.debug(f"Guess: {sample_ids[receiver_action]} at p{receiver_action}. Correct is {correct_id} at p{correct_pos}.")
-
-        # Evaluate and reward
-        if receiver_action == correct_pos:
-            self.sender.fit(sender_state, sender_action, self.reward_sender["success"])
-            self.receiver.fit(receiver_state, receiver_action, self.reward_receiver["success"])
-            log.debug("Correct")
-            is_success = True
-        else:
-            self.sender.fit(sender_state, sender_action, self.reward_sender["fail"])
-            self.receiver.fit(receiver_state, receiver_action, self.reward_receiver["fail"])
-            log.debug("Wrong")
-            is_success = False
-        log.info(f"Turn {self.episode} finished: {'SUCCESS' if is_success else 'FAIL'}.")
+    def take_turn(self, sender, receiver, n_images=2):
+        self.reset()
+        sender_state = self.get_sender_state(n_images)
+        sender_action, sender_prob = sender.act(sender_state)
+        receiver_state = self.get_receiver_state(sender_action)
+        receiver_action, receiver_prob = receiver.act(receiver_state)
+        sender_reward, receiver_reward, success = self.evaluate_guess(receiver_action)
+        sender.remember(sender_state, sender_action, sender_reward)
+        receiver.remember(receiver_state, receiver_action, receiver_reward)
         self.episode += 1
-        return is_success
+        return success
 
-    def get_sender_state(self, n_images=2):
-        self.sample_ids = np.random.choice(a=self.image_ids, size=n_images, replace=False)
+    def get_sender_state(self, n_images=2, unique_categories=False):
+        if unique_categories:
+            self.sample_ids = np.zeros(n_images, dtype="int32")
+            sample_ctgs = np.random.choice(a=self.categories, size=n_images, replace=False)
+            for i in range(n_images):
+                self.sample_ids[i] = np.random.choice(self.categorized_images[sample_ctgs[i]], size=1)
+            print(sample_ctgs, self.sample_ids)
+        else:
+            self.sample_ids = np.random.choice(a=self.image_ids, size=n_images, replace=False)
         self.correct_pos_sender = 0
         self.correct_id = self.sample_ids[self.correct_pos_sender]
         log.debug(f"Picked images {self.sample_ids}. Correct {self.correct_id}.")
