@@ -8,7 +8,7 @@ import logging
 import numpy as np
 import game.game as game
 # import agent.reinforce_agent as agent
-import agent.test_agent as agent
+import agent.q_agent as agent
 from utils.embeddings import load_emb_gz
 from keras.optimizers import Adam, SGD, Adagrad
 import matplotlib.pyplot as plt
@@ -30,23 +30,23 @@ _, fnames, embs = load_emb_gz(IMG_EMB_FILE, N_IMAGES)
 IMG_SHAPE = embs[0].shape
 IMG_N = len(embs)
 
-sender = agent.Sender(input_sizes=[IMG_SHAPE, IMG_SHAPE],
-                      output_size=N_SYMBOLS,
-                      n_symbols=N_SYMBOLS,
-                      embedding_size=50,
-                      learning_rate=0.001,
-                      gibbs_temp=10,
-                      use_bias=True,
-                      optimizer=Adam)
-# sender = agent.SenderInformed(input_sizes=[IMG_SHAPE, IMG_SHAPE],
-#                               output_size=N_SYMBOLS,
-#                               n_symbols=N_SYMBOLS,
-#                               n_filters=20,
-#                               embedding_size=50,
-#                               learning_rate=0.001,
-#                               gibbs_temp=10,
-#                               use_bias=False,
-#                               optimizer=Adam)
+# sender = agent.Sender(input_sizes=[IMG_SHAPE, IMG_SHAPE],
+#                       output_size=N_SYMBOLS,
+#                       n_symbols=N_SYMBOLS,
+#                       embedding_size=50,
+#                       learning_rate=0.001,
+#                       gibbs_temp=10,
+#                       use_bias=True,
+#                       optimizer=Adam)
+sender = agent.SenderInformed(input_sizes=[IMG_SHAPE, IMG_SHAPE],
+                              output_size=N_SYMBOLS,
+                              n_symbols=N_SYMBOLS,
+                              n_filters=20,
+                              embedding_size=50,
+                              learning_rate=0.001,
+                              gibbs_temp=10,
+                              use_bias=True,
+                              optimizer=Adam)
 g = game.Game(images=embs,
               images_filenames=fnames,
               reward_sender={"success": 1, "fail": 0},

@@ -33,8 +33,10 @@ class Agent:
         self.last_action = None
         self.last_loss = 0
         self.last_weights = None
-        self.train_model = None
-        self.predict_model = None
+        self.model = None
+        self.exploration_rate = 1.
+        self.exploration_rate_decay = 0.99
+        self.exploration_min = 0.015
         self.learning_rate = learning_rate
         self.gibbs_temp = gibbs_temp
         self.optimizer = optimizer(self.learning_rate, clipnorm=1.)
@@ -47,22 +49,30 @@ class Agent:
     def _build_model(self, **kwargs):
         raise NotImplementedError
 
-    def act(self, state):
+    def act(self, state, explore=True):
         state = [np.expand_dims(st, 0) for st in state]
-        act_probs = self.predict_model.predict(state)
-        # act_probs = self.train_model.predict([*state, np.asarray([0])])
-        act_probs = np.squeeze(act_probs)
-        action = np.random.choice(range(self.output_size), 1, p=act_probs)
+        #action = np.zeros(self.output_size)
+        act_probs = np.zeros(self.output_size)
+        if explore and np.random.rand() > self.exploration_rate:
+            if self.exploration_rate > self.exploration_min:
+                self.exploration_rate *= self.exploration_rate_decay
+            action = np.random.randint(0, self.output_size)
+        else:
+            act_probs = self.model.predict(state)
+            # act_probs = self.train_model.predict([*state, np.asarray([0])])
+            act_probs = np.squeeze(act_probs)
+            action = np.argmax(act_probs)
+            # action = np.random.choice(range(self.output_size), 1, p=act_probs)
         self.last_action = (state, action, act_probs)
         return action, act_probs
 
     def fit(self, state, action, reward):
-        self.last_weights = self.train_model.get_weights()
+        # self.last_weights = self.model.get_weights()
         action_onehot = np.zeros([self.output_size])
         action_onehot[action] = 1
         X = [np.expand_dims(st, 0) for st in state]
         Y = np.expand_dims(action_onehot, 0)
-        self.last_loss = self.train_model.train_on_batch([*X, reward], Y)
+        self.last_loss = self.model.train_on_batch([*X, reward], Y)
         # self.last_updates = self.optimizer.get_updates() # needs args: loss and params
 
     def remember(self, state, action, reward):
@@ -74,9 +84,12 @@ class Agent:
         self.batch_rewards.append(reward)
 
     def batch_train(self):
-        self.last_loss = self.train_model.train_on_batch(
-            [np.stack(stack) for stack in [*self.batch_states, self.batch_rewards]],
-            np.stack(self.batch_actions)
+        q_values = self.model.predict(self.batch_states)
+        for i in range(len(self.batch_rewards)):
+            q_values[i][self.batch_actions[i].astype("bool")] = self.batch_rewards[i]
+        self.last_loss = self.model.train_on_batch(
+            self.batch_states,
+            q_values
         )
         self.reset_batch()
 
@@ -86,10 +99,10 @@ class Agent:
         self.batch_rewards = []
 
     def load(self, name):
-        self.train_model.load_weights(name)
+        self.model.load_weights(name)
 
     def save(self, name):
-        self.train_model.save_weights(name)
+        self.model.save_weights(name)
 
 
 class Sender(Agent):
@@ -119,7 +132,7 @@ class Sender(Agent):
         #                    # kernel_initializer=init.glorot_uniform(seed=42)
         #                    )(concat)
         out = layers.Dense(self.output_size,
-                           activation='sigmoid',
+                           activation='linear',
                            use_bias=self.use_bias,
                            # kernel_initializer=init.glorot_uniform(seed=42)
                            )(concat)
@@ -127,26 +140,9 @@ class Sender(Agent):
         temp = layers.Lambda(lambda x: x / self.gibbs_temp)
         soft = layers.Activation("softmax")
         predict_out = soft(temp(out))
-        train_out = soft(out)
-        # train_out = out
 
-        reward = layers.Input((1,), name="reward")
-
-        def custom_loss(y_true, y_pred):
-            # Cross-entropy 1 (??)
-            # log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
-            # return K.mean(log_lik * reward, keepdims=True)
-
-            # Cross-entropy 2
-            return K.sum(K.log(y_pred) * y_true) * reward
-
-            # RMS loss
-            # return K.mean((K.square(y_pred - y_true))) * reward
-
-        self.train_model = Model([*inputs, reward], train_out)
-        self.train_model.compile(loss=custom_loss, optimizer=self.optimizer)
-        self.predict_model = Model(inputs, predict_out)
-        # self.predict_model.compile(loss=custom_loss, optimizer=self.optimizer)
+        self.model = Model(inputs, out)
+        self.model.compile(loss="mse", optimizer=self.optimizer)
 
 
 class SenderInformed(Agent):
@@ -160,7 +156,7 @@ class SenderInformed(Agent):
                                name=f"input_{i}")
                   for i in range(n_inputs)]
         embs = [layers.Dense(self.embedding_size,
-                             activation='sigmoid',
+                             activation='relu',
                              use_bias=self.use_bias,
                              # kernel_initializer=init.glorot_uniform(seed=42),
                              # kernel_regularizer=l2(0.001),
@@ -168,7 +164,7 @@ class SenderInformed(Agent):
                 for i in range(n_inputs)]
 
         emb = layers.Dense(self.embedding_size,
-                           activation='sigmoid',
+                           activation='relu',
                            use_bias=self.use_bias,
                            # kernel_initializer=init.glorot_uniform(seed=42),
                            # kernel_regularizer=l2(0.001),
@@ -181,7 +177,7 @@ class SenderInformed(Agent):
         reshape = layers.Reshape((-1, self.embedding_size, 1))
         feat_filters = layers.Conv2D(filters=n_filters,
                                      kernel_size=(2, 1),
-                                     activation="sigmoid",
+                                     activation="relu",
                                      # padding="same",
                                      # strides=embedding_size,
                                      # data_format="channels_last",
@@ -190,35 +186,17 @@ class SenderInformed(Agent):
 
         voc_filter = layers.Conv2D(1, (1, n_filters),
                                    # padding="same",
+                                   activation="sigmoid",
                                    data_format="channels_first",
                                    name="vocab_filter"
                                    )
 
-        dense = layers.Dense(output_size, name="output_dense")
+        dense = layers.Dense(output_size, activation="linear", name="output_dense")
 
         out = dense(layers.Flatten()(voc_filter(feat_filters(reshape(stack(imgs))))))
 
-        temp = layers.Lambda(lambda x: x / 10, name="gibbs_temp")
-        soft = layers.Activation("softmax", name="softmax")
-        predict_out = soft(temp(out))
-        train_out = soft(out)
-
-        reward = layers.Input((1,), name="reward")
-
-        def custom_loss(y_true, y_pred):
-            # Cross-entropy 1 (??)
-            # log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
-            # return K.mean(log_lik * reward, keepdims=True)
-
-            # Cross-entropy 2
-            return K.sum(K.log(y_pred) * y_true) * reward
-
-            # RMS loss
-            # return K.mean((K.square(y_pred - y_true))) * reward
-
-        self.train_model = Model([*inputs, reward], train_out)
-        self.train_model.compile(loss=custom_loss, optimizer=self.optimizer)
-        self.predict_model = Model(inputs, predict_out)
+        self.model = Model(inputs, out)
+        self.model.compile(loss="mse", optimizer=self.optimizer)
 
 
 class Receiver(Agent):
@@ -279,29 +257,5 @@ class Receiver(Agent):
         else:
             raise ValueError(f"'{self.mode}' is not a valid mode.")
 
-        # cossim = layers.Lambda(cosine_distance, output_shape=(1,))
-        # sims = [cossim([img, symbol]) for img in imgs]
-        # out = layers.concatenate(sims, axis=-1)
-        # p = print_layer(out, "rec 1")
-        temp = layers.Lambda(lambda x: x / self.gibbs_temp)
-        soft = layers.Activation("softmax")
-        predict_out = soft(temp(out))
-        train_out = soft(out)
-        # train_out = out
-
-        reward = layers.Input((1,), name="reward")
-
-        def custom_loss(y_true, y_pred):
-            # Cross-entropy 1 (??)
-            # log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
-            # return K.mean(log_lik * reward, keepdims=True)
-
-            # Cross-entropy 2
-            return K.sum(K.log(y_pred) * y_true) * reward
-
-            # RMS loss
-            # return K.mean((K.square(y_pred - y_true))) * reward
-
-        self.train_model = Model([*inputs, sym_input, reward], train_out)
-        self.train_model.compile(loss=custom_loss, optimizer=self.optimizer)
-        self.predict_model = Model([*inputs, sym_input], predict_out)
+        self.model = Model(inputs, out)
+        self.model.compile(loss="mse", optimizer=self.optimizer)

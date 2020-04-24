@@ -8,7 +8,7 @@ import logging
 import numpy as np
 import game.game as game
 # import agent.reinforce_agent as agent
-import agent.test_agent as agent
+import agent.q_agent as agent
 from utils.embeddings import load_emb_gz
 from keras.optimizers import Adam, SGD, Adagrad
 import matplotlib.pyplot as plt

@@ -7,7 +7,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 import logging
 import numpy as np
 import game.game as game
-import agent.reinforce_agent as agent
+import agent.q_agent as agent
 from utils.embeddings import load_emb_gz
 from keras.optimizers import Adam, SGD, Adagrad
 import matplotlib.pyplot as plt
@@ -38,7 +38,7 @@ receiver = agent.Receiver(input_sizes=[IMG_SHAPE, IMG_SHAPE, (1,)],
                           mode="dot",  # original with dot product output
                           # mode="dense",  # dense layer + sigmoid instead
                           # mode="cosine",  # cosine distance (= norm and dot)
-                          use_bias=False,
+                          use_bias=True,
                           optimizer=Adam)
 g = game.Game(images=embs,
               images_filenames=fnames,
