@@ -68,9 +68,15 @@ def load_emb_gz(filename, n_items=None):
     return word2ind, ind2word, np.stack(embeddings)
 
 
-def make_categories(filenames):
-    filenames_split = [f.split(os.path.sep)[-2] for f in filenames]
+def make_categories(filenames, sep=None):
+    if sep is None:
+        sep = os.path.sep
+    if len(filenames[0].split(sep)) < 2:
+        print("No categories found.")
+        return None
+    filenames_split = [f.split(sep)[-2] for f in filenames]
     uniq, cat = np.unique(filenames_split, return_inverse=True)
+    print(f"{len(uniq)} categories found.")
     return cat
 
 

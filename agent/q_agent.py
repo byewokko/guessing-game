@@ -39,7 +39,7 @@ class Agent:
         self.exploration_min = 0.015
         self.learning_rate = learning_rate
         self.gibbs_temp = gibbs_temp
-        self.optimizer = optimizer(self.learning_rate, clipnorm=1.)
+        self.optimizer = optimizer(self.learning_rate)
         self.use_bias = use_bias
         self.batch_states = None
         self.batch_actions = None
@@ -116,7 +116,7 @@ class Sender(Agent):
                                name=f"input_{i}")
                   for i in range(n_inputs)]
         embs = [layers.Dense(self.embedding_size,
-                             activation='relu',
+                             activation="linear",
                              use_bias=self.use_bias,
                              # kernel_initializer=init.glorot_uniform(seed=42),
                              # kernel_regularizer=l2(0.001),
@@ -132,14 +132,10 @@ class Sender(Agent):
         #                    # kernel_initializer=init.glorot_uniform(seed=42)
         #                    )(concat)
         out = layers.Dense(self.output_size,
-                           activation='linear',
+                           activation='sigmoid',
                            use_bias=self.use_bias,
                            # kernel_initializer=init.glorot_uniform(seed=42)
                            )(concat)
-
-        temp = layers.Lambda(lambda x: x / self.gibbs_temp)
-        soft = layers.Activation("softmax")
-        predict_out = soft(temp(out))
 
         self.model = Model(inputs, out)
         self.model.compile(loss="mse", optimizer=self.optimizer)
@@ -156,7 +152,7 @@ class SenderInformed(Agent):
                                name=f"input_{i}")
                   for i in range(n_inputs)]
         embs = [layers.Dense(self.embedding_size,
-                             activation='relu',
+                             activation='linear',
                              use_bias=self.use_bias,
                              # kernel_initializer=init.glorot_uniform(seed=42),
                              # kernel_regularizer=l2(0.001),
@@ -164,7 +160,7 @@ class SenderInformed(Agent):
                 for i in range(n_inputs)]
 
         emb = layers.Dense(self.embedding_size,
-                           activation='relu',
+                           activation='linear',
                            use_bias=self.use_bias,
                            # kernel_initializer=init.glorot_uniform(seed=42),
                            # kernel_regularizer=l2(0.001),
@@ -177,7 +173,8 @@ class SenderInformed(Agent):
         reshape = layers.Reshape((-1, self.embedding_size, 1))
         feat_filters = layers.Conv2D(filters=n_filters,
                                      kernel_size=(2, 1),
-                                     activation="relu",
+                                     activation="sigmoid",
+                                     # activation="elu",
                                      # padding="same",
                                      # strides=embedding_size,
                                      # data_format="channels_last",
@@ -186,12 +183,12 @@ class SenderInformed(Agent):
 
         voc_filter = layers.Conv2D(1, (1, n_filters),
                                    # padding="same",
-                                   activation="sigmoid",
+                                   activation="linear",
                                    data_format="channels_first",
                                    name="vocab_filter"
                                    )
 
-        dense = layers.Dense(output_size, activation="linear", name="output_dense")
+        dense = layers.Dense(output_size, activation="softmax", name="output_dense")
 
         out = dense(layers.Flatten()(voc_filter(feat_filters(reshape(stack(imgs))))))
 
@@ -246,16 +243,18 @@ class Receiver(Agent):
             dot_prods = [dot([norm(img), norm(symbol)]) for img in imgs]
             out = layers.concatenate(dot_prods, axis=-1)
         elif self.mode == "dense":
-            dense_join = layers.Dense(self.embedding_size,
-                                      activation="sigmoid",
-                                      # kernel_initializer=init.glorot_uniform(seed=42),
-                                      name=f"dense_join")
-            dense_out = layers.Dense(self.output_size,
-                                     # kernel_initializer=init.glorot_uniform(seed=42),
-                                     name=f"dense_out")
-            out = dense_out(dense_join(layers.concatenate([*imgs, symbol], axis=-1)))
+            out = layers.concatenate([*imgs, symbol], axis=-1)
+            out = layers.Dense(self.embedding_size,
+                               # activation=layers.PReLU(),
+                               # kernel_initializer=init.glorot_uniform(seed=42),
+                               name=f"dense_join")(out)
+            out = layers.Dense(self.output_size,
+                               # kernel_initializer=init.glorot_uniform(seed=42),
+                               name=f"dense_out")(out)
         else:
             raise ValueError(f"'{self.mode}' is not a valid mode.")
 
-        self.model = Model(inputs, out)
+        out = layers.Activation("softmax")(out)
+
+        self.model = Model([*inputs, sym_input], out)
         self.model.compile(loss="mse", optimizer=self.optimizer)

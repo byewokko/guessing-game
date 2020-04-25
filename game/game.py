@@ -44,6 +44,7 @@ class Game:
                 self.categorized_images[c] = self.image_ids[idx]
 
         self.sample_ids = None
+        self.sample_ctgs = None
         self.correct_pos_sender = None
         self.correct_pos_receiver = None
         self.correct_id = None
@@ -61,11 +62,11 @@ class Game:
         return success
 
     def get_sender_state(self, n_images=2, unique_categories=False):
-        if unique_categories:
+        if unique_categories and self.categories is not None:
+            self.sample_ctgs = np.random.choice(a=self.categories, size=n_images, replace=False)
             self.sample_ids = np.zeros(n_images, dtype="int32")
-            sample_ctgs = np.random.choice(a=self.categories, size=n_images, replace=False)
             for i in range(n_images):
-                self.sample_ids[i] = np.random.choice(self.categorized_images[sample_ctgs[i]], size=1)
+                self.sample_ids[i] = np.random.choice(self.categorized_images[self.sample_ctgs[i]], size=1)
         else:
             self.sample_ids = np.random.choice(a=self.image_ids, size=n_images, replace=False)
         self.correct_pos_sender = 0
@@ -101,6 +102,7 @@ class Game:
 
     def reset(self):
         self.sample_ids = None
+        self.sample_ctgs = None
         self.correct_pos_sender = None
         self.correct_pos_receiver = None
         self.correct_id = None
