@@ -8,6 +8,7 @@ import logging
 import numpy as np
 import game.game as game
 import agent.q_agent as agent
+# import agent.q_agent as agent
 from utils.embeddings import load_emb_gz, make_categories
 from keras.optimizers import Adam, SGD, Adagrad
 import matplotlib.pyplot as plt
@@ -21,7 +22,7 @@ IMG_EMB_FILE = "data/imagenet-4000-vgg19.emb.gz"
 # IMG_EMB_FILE = "data/esp-10000-esp-vgg19.emb.gz"
 # IMG_EMB_FILE = "data/esp-10000-esp-xception.emb.gz"
 N_SYMBOLS = 10
-N_CHOICES = 4
+N_CHOICES = 2
 EMB_SIZE = 50
 N_IMAGES = None
 BATCH_SIZE = 30
@@ -44,28 +45,28 @@ sender = agent.Sender(input_sizes=[IMG_SHAPE] * N_CHOICES,
                       n_symbols=N_SYMBOLS,
                       embedding_size=50,
                       learning_rate=0.01,
-                      gibbs_temp=10,
-                      use_bias=False,
+                      gibbs_temp=2,
+                      use_bias=True,
                       optimizer=Adam)
-sender = agent.SenderInformed(input_sizes=[IMG_SHAPE] * N_CHOICES,
-                              output_size=N_SYMBOLS,
-                              n_symbols=N_SYMBOLS,
-                              n_filters=10,
-                              embedding_size=50,
-                              learning_rate=0.02,
-                              gibbs_temp=10,
-                              use_bias=False,
-                              optimizer=Adam)
+# sender = agent.SenderInformed(input_sizes=[IMG_SHAPE] * N_CHOICES,
+#                               output_size=N_SYMBOLS,
+#                               n_symbols=N_SYMBOLS,
+#                               n_filters=20,
+#                               embedding_size=50,
+#                               learning_rate=0.02,
+#                               gibbs_temp=10,
+#                               use_bias=False,
+#                               optimizer=Adam)
 receiver = agent.Receiver(input_sizes=[IMG_SHAPE] * N_CHOICES + [(1,)],
                           output_size=N_CHOICES,
                           n_symbols=N_SYMBOLS,
                           embedding_size=50,
                           learning_rate=0.01,
-                          gibbs_temp=10,
+                          gibbs_temp=2,
                           mode="dot",  # original with dot product output
                           # mode="dense",  # dense layer + sigmoid instead
                           # mode="cosine",  # cosine distance (= norm and dot)
-                          use_bias=False,
+                          use_bias=True,
                           optimizer=Adam)
 g = game.Game(images=embs,
               images_filenames=fnames,
@@ -92,20 +93,23 @@ recvr_loss = []
 success_rate_avg = []
 sendr_loss_avg = None
 recvr_loss_avg = None
+explore = "gibbs"
 for i in range(N_EPISODES):
     g.reset()
     sender_state = g.get_sender_state(n_images=N_CHOICES, unique_categories=True)
-    sender_action, _ = sender.act(sender_state)
+    sender_action, _ = sender.act(sender_state, explore=explore)
     receiver_state = g.get_receiver_state(sender_action)
-    receiver_action, _ = receiver.act(receiver_state)
+    receiver_action, _ = receiver.act(receiver_state, explore=explore)
     sender_reward, receiver_reward, success = g.evaluate_guess(receiver_action)
     sender.remember(sender_state, sender_action, sender_reward)
     receiver.remember(receiver_state, receiver_action, receiver_reward)
     batch_success.append(success)
 
+    if i == 3000:
+        explore = False
     # TRAIN
     if i and not i % BATCH_SIZE:
-        avg_success = sum(batch_success)/len(batch_success)
+        avg_success = sum(batch_success) / len(batch_success)
         batch_success = []
         sender.batch_train()
         receiver.batch_train()

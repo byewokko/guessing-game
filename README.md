@@ -6,6 +6,7 @@ Part of my master thesis project.
 
 ## TODO:
 
+- 2020/04/25 ... made the agents learn with **Q-learning** instead of Reinforce
 - the agents are not learning at all
     - take time to understand [this explanation of policy 
 gradient](https://towardsdatascience.com/policy-gradients-in-a-nutshell-8b72f9743c5d)
@@ -18,5 +19,5 @@ gradient](https://towardsdatascience.com/policy-gradients-in-a-nutshell-8b72f974
     - reuse this agent to play cartpole and debug
 - exploding weights -> NaN
     - some hyperparameter setting lead to exploding weights in the bottom (embedding) layers
-- implement batches
+- implement batches ... DONE
     - the paper uses batch_size = 32

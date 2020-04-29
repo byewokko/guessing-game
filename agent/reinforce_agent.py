@@ -37,6 +37,9 @@ class Agent:
         self.predict_model = None
         self.learning_rate = learning_rate
         self.gibbs_temp = gibbs_temp
+        self.exploration_rate = 1.
+        self.exploration_rate_decay = 0.99
+        self.exploration_min = 0.015
         self.optimizer = optimizer(self.learning_rate, clipnorm=1.)
         self.use_bias = use_bias
         self.batch_states = None
@@ -47,12 +50,21 @@ class Agent:
     def _build_model(self, **kwargs):
         raise NotImplementedError
 
-    def act(self, state):
+    def act(self, state, explore=True):
         state = [np.expand_dims(st, 0) for st in state]
         act_probs = self.predict_model.predict(state)
         # act_probs = self.train_model.predict([*state, np.asarray([0])])
         act_probs = np.squeeze(act_probs)
-        action = np.random.choice(range(self.output_size), 1, p=act_probs)
+        # TODO: fix the sampling, this is stupid
+        if explore and np.random.rand() > self.exploration_rate:
+            if self.exploration_rate > self.exploration_min:
+                self.exploration_rate *= self.exploration_rate_decay
+            # Sample from Gibbs distribution
+            act_probs_exp = np.exp(act_probs / self.gibbs_temp)
+            act_probs = act_probs_exp / act_probs_exp.sum()
+            # action = np.random.choice(range(self.output_size), 1, p=act_probs)
+        else:
+            action = np.argmax(act_probs)
         self.last_action = (state, action, act_probs)
         return action, act_probs
 
