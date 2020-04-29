@@ -1,4 +1,5 @@
 import numpy as np
+from datetime import datetime as dt
 from keras.models import Model
 import keras.layers as layers
 import keras.optimizers as optim
@@ -7,6 +8,7 @@ import keras.initializers as init
 from keras.losses import categorical_crossentropy
 from keras.regularizers import l2
 
+from agent import component
 from utils.debug import print_layer
 
 GIBBS_TEMPERATURE = 0.05
@@ -24,15 +26,16 @@ EXPLORATION_FLOOR = .015
 class Agent:
     input_type = "data"
 
-    def __init__(self, input_sizes, output_size, n_symbols, **kwargs):
+    def __init__(self, input_shapes, output_size, n_symbols, **kwargs):
         self.last_updates = None
         self.n_input_images = 2
-        self.input_sizes = input_sizes
+        self.input_shapes = input_shapes
         self.output_size = output_size
         self.n_symbols = n_symbols
         self.last_action = None
         self.last_loss = 0
         self.last_weights = None
+        self.role = None
         self.model = None
         self.model_predict = None
         self.exploration_rate = EXPLORATION_RATE
@@ -56,12 +59,12 @@ class Agent:
             # Sample from Gibbs distribution
             act_probs_exp = np.exp(act_probs / gibbs_temperature)
             act_probs = act_probs_exp / act_probs_exp.sum()
-            action = np.random.choice(range(self.output_size), 1, p=act_probs)
+            action = np.random.choice(range(len(act_probs)), 1, p=act_probs)
         elif explore == "decay":
             if np.random.rand() > self.exploration_rate:
                 if self.exploration_rate > self.exploration_min:
                     self.exploration_rate *= self.exploration_rate_decay
-                action = np.random.choice(range(self.output_size), 1)
+                action = np.random.choice(range(len(act_probs)), 1)
             else:
                 action = np.argmax(act_probs)
         else:
@@ -97,7 +100,7 @@ class Agent:
         self.reset_batch()
 
     def reset_batch(self):
-        self.batch_states = [[] for _ in self.input_sizes]
+        self.batch_states = [[] for _ in self.input_shapes]
         self.batch_actions = []
         self.batch_rewards = []
 
@@ -111,13 +114,14 @@ class Agent:
 class Sender(Agent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.role = "sender"
         self._build_model(**kwargs)
 
-    def _build_model(self, input_sizes, output_size, embedding_size=EMBEDDING_SIZE,
+    def _build_model(self, input_shapes, output_size, embedding_size=EMBEDDING_SIZE,
                      use_bias=USE_BIAS, loss=LOSS, optimizer=OPTIMIZER, learning_rate=LEARNING_RATE,
                      **kwargs):
-        n_inputs = len(input_sizes)
-        inputs = [layers.Input(shape=input_sizes[i],
+        n_inputs = len(input_shapes)
+        inputs = [layers.Input(shape=input_shapes[i],
                                name=f"input_{i}")
                   for i in range(n_inputs)]
         embs = [layers.Dense(embedding_size,
@@ -150,13 +154,14 @@ class Sender(Agent):
 class SenderInformed(Agent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.role = "sender"
         self._build_model(**kwargs)
 
-    def _build_model(self, input_sizes, output_size, n_filters=CNN_FILTERS, embedding_size=EMBEDDING_SIZE,
+    def _build_model(self, input_shapes, output_size, n_filters=CNN_FILTERS, embedding_size=EMBEDDING_SIZE,
                      use_bias=USE_BIAS, loss=LOSS, optimizer=OPTIMIZER, learning_rate=LEARNING_RATE,
                      **kwargs):
-        n_inputs = len(self.input_sizes)
-        inputs = [layers.Input(shape=self.input_sizes[i],
+        n_inputs = len(self.input_shapes)
+        inputs = [layers.Input(shape=self.input_shapes[i],
                                name=f"input_{i}")
                   for i in range(n_inputs)]
         embs = [layers.Dense(embedding_size,
@@ -207,13 +212,14 @@ class SenderInformed(Agent):
 class Receiver(Agent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.role = "receiver"
         self._build_model(**kwargs)
 
-    def _build_model(self, input_sizes, output_size, embedding_size=EMBEDDING_SIZE,
+    def _build_model(self, input_shapes, output_size, embedding_size=EMBEDDING_SIZE,
                      use_bias=USE_BIAS, loss=LOSS, optimizer=OPTIMIZER, learning_rate=LEARNING_RATE,
                      mode="dot", **kwargs):
-        n_input_images = len(input_sizes) - 1
-        inputs = [layers.Input(shape=input_sizes[i],
+        n_input_images = len(input_shapes) - 1
+        inputs = [layers.Input(shape=input_shapes[i],
                                name=f"input_{i}")
                   for i in range(n_input_images)]
         embs = [layers.Dense(embedding_size,
@@ -233,7 +239,7 @@ class Receiver(Agent):
         # imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
         imgs = [emb(inputs[i]) for i in range(n_input_images)]  # same embedding layer for all images
 
-        symbol_shape = input_sizes[-1]
+        symbol_shape = input_shapes[-1]
         sym_input = layers.Input(shape=symbol_shape, dtype="int32", name="input_sym")
         emb_sym = layers.Embedding(input_dim=self.n_symbols,
                                    output_dim=embedding_size,
@@ -267,18 +273,22 @@ class MultiAgent(Agent):
     def __init__(self, role="sender", **kwargs):
         super().__init__(**kwargs)
         self.role = None
-        self.sender_model = None
-        self.receiver_model = None
+        self.net = {"sender": component.Net(),
+                    "receiver": component.Net()}
         self._build_model(**kwargs)
         self.set_role(role)
 
-    def _build_model(self, input_sizes, n_symbols, embedding_size=EMBEDDING_SIZE,
+    def active_net(self):
+        assert self.role in self.net.keys()
+        return self.net[self.role]
+
+    def _build_model(self, input_shapes, n_symbols, embedding_size=EMBEDDING_SIZE,
                      use_bias=USE_BIAS, loss=LOSS, optimizer=OPTIMIZER, learning_rate=LEARNING_RATE,
                      mode="dot", **kwargs):
         # Shared part
-        n_inputs = len(input_sizes)
-        n_input_images = len(input_sizes) - 1
-        inputs = [layers.Input(shape=input_sizes[i],
+        n_inputs = len(input_shapes)
+        n_input_images = len(input_shapes) - 1
+        inputs = [layers.Input(shape=input_shapes[i],
                                name=f"input_{i}")
                   for i in range(n_input_images)]
         embs = [layers.Dense(embedding_size,
@@ -301,11 +311,14 @@ class MultiAgent(Agent):
                            use_bias=use_bias,
                            )(concat)
 
-        self.sender_model = Model(inputs, out)
-        self.sender_model.compile(loss=loss, optimizer=optimizer(lr=learning_rate))
+        self.net["sender"].model = Model(inputs, out)
+        self.net["sender"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate))
+        self.net["sender"].input_shapes = input_shapes[:-1]
+        self.net["sender"].output_size = n_symbols
+        self.net["sender"].reset_batch()
 
         # Receiver part
-        symbol_shape = input_sizes[-1]
+        symbol_shape = input_shapes[-1]
         sym_input = layers.Input(shape=symbol_shape, dtype="int32", name="input_sym")
         emb_sym = layers.Embedding(input_dim=n_symbols,
                                    output_dim=embedding_size,
@@ -329,21 +342,69 @@ class MultiAgent(Agent):
         else:
             raise ValueError(f"'{mode}' is not a valid mode.")
 
-        out = layers.Activation("softmax")(out)
+        out = layers.Activation("sigmoid")(out)
 
-        self.receiver_model = Model([*inputs, sym_input], out)
-        self.receiver_model.compile(loss=loss, optimizer=optimizer(lr=learning_rate))
+        self.net["receiver"].model = Model([*inputs, sym_input], out)
+        self.net["receiver"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate))
+        self.net["receiver"].input_shapes = input_shapes
+        self.net["receiver"].output_size = n_input_images
+        self.net["receiver"].reset_batch()
 
     def set_role(self, role="sender"):
         assert role in ("sender", "receiver")
         self.role = role
-        if role == "sender":
-            self.model = self.sender_model
-        else:
-            self.model = self.receiver_model
 
     def switch_role(self):
         if self.role == "sender":
             self.set_role("receiver")
         else:
             self.set_role("sender")
+
+    def act(self, state, explore="gibbs", gibbs_temperature=0.05):
+        assert explore in (False, "gibbs", "decay")
+        state = [np.expand_dims(st, 0) for st in state]
+        # action = np.zeros(self.output_size)
+        act_probs = self.active_net().predict(state)
+        act_probs = np.squeeze(act_probs)
+        if explore == "gibbs":
+            # Sample from Gibbs distribution
+            act_probs_exp = np.exp(act_probs / gibbs_temperature)
+            act_probs = act_probs_exp / act_probs_exp.sum()
+            action = np.random.choice(range(len(act_probs)), 1, p=act_probs)
+        elif explore == "decay":
+            if np.random.rand() > self.exploration_rate:
+                if self.exploration_rate > self.exploration_min:
+                    self.exploration_rate *= self.exploration_rate_decay
+                action = np.random.choice(range(len(act_probs)), 1)
+            else:
+                action = np.argmax(act_probs)
+        else:
+            action = np.argmax(act_probs)
+        self.last_action = (state, action, act_probs)
+        return action, act_probs
+
+    def fit(self, state, action, reward):
+        # self.last_weights = self.model.get_weights()
+        action_onehot = np.zeros([self.output_size])
+        action_onehot[action] = 1
+        X = [np.expand_dims(st, 0) for st in state]
+        Y = np.expand_dims(action_onehot, 0)
+        self.last_loss = self.active_net().train_on_batch([*X, reward], Y)
+        # self.last_updates = self.optimizer.get_updates() # needs args: loss and params
+
+    def remember(self, state, action, reward):
+        self.active_net().remember(state, action, reward)
+
+    def batch_train(self):
+        self.last_loss = self.active_net().batch_train()
+
+    def load(self, name):
+        self.net["sender"].model.load_weights(f"{name}.snd")
+        self.net["receiver"].model.load_weights(f"{name}.rcv")
+
+    def save(self, name=None):
+        if not name:
+            time = dt.now().strftime("%y%m%d-%H%M")
+            name = f"model-{time}"
+        self.net["sender"].model.save_weights(f"{name}.snd")
+        self.net["receiver"].model.save_weights(f"{name}.rcv")
