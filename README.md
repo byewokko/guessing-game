@@ -12,4 +12,4 @@ Part of my master thesis project.
   - gibbs sampler is too random
 - using **Q-learning** instead of Reinforce does work smooth
   - [q_agent.py](agent/q_agent.py)
-  - however the results are not as good as in the original paper (Lazaridou &al, 2017) with Reinforce
+  - however the results are not as good they were supposed to be with Reinforce, according the original paper (Lazaridou &al, 2017)
