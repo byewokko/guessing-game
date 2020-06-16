@@ -301,8 +301,8 @@ class MultiAgent(Agent):
                            use_bias=use_bias,
                            name=f"embed_img")
 
-        # imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
-        imgs = [emb(inputs[i]) for i in range(n_input_images)]  # same embedding layer for all images
+        imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
+        # imgs = [emb(inputs[i]) for i in range(n_input_images)]  # same embedding layer for all images
 
         # Sender part
         concat = layers.concatenate(imgs, axis=-1)

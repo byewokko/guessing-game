@@ -9,7 +9,7 @@ import numpy as np
 import game.game as game
 import agent.q_agent as agent
 # import agent.q_agent as agent
-from utils.embeddings import load_emb_gz, make_categories
+from utils.dataprep import load_emb_gz, make_categories
 from keras.optimizers import Adam, SGD, Adagrad
 import matplotlib.pyplot as plt
 
@@ -22,7 +22,7 @@ IMG_EMB_FILE = "data/imagenet-4000-vgg19.emb.gz"
 # IMG_EMB_FILE = "data/esp-10000-esp-vgg19.emb.gz"
 # IMG_EMB_FILE = "data/esp-10000-esp-xception.emb.gz"
 N_SYMBOLS = 10
-N_CHOICES = 2
+N_CHOICES = 4
 EMB_SIZE = 50
 N_IMAGES = None
 BATCH_SIZE = 30
@@ -94,6 +94,7 @@ success_rate_avg = []
 sendr_loss_avg = None
 recvr_loss_avg = None
 explore = "gibbs"
+# explore = False
 for i in range(N_EPISODES):
     g.reset()
     sender_state = g.get_sender_state(n_images=N_CHOICES, unique_categories=True)
@@ -105,8 +106,8 @@ for i in range(N_EPISODES):
     receiver.remember(receiver_state, receiver_action, receiver_reward)
     batch_success.append(success)
 
-    if i == 3000:
-        explore = False
+    # if i == 3000:
+    #     explore = False
     # TRAIN
     if i and not i % BATCH_SIZE:
         avg_success = sum(batch_success) / len(batch_success)

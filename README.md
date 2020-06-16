@@ -6,6 +6,12 @@ Part of my master thesis project.
 
 ## TODO:
 
+- check [this pytorch implementation](https://github.com/thirdratecyberpunk/lazaridou-game)
+- cluster concepts/symbols using tSNE
+- reproducibility: set seeds
+    - [explained here](https://stackoverflow.com/questions/50659482/why-cant-i-get-reproducible-results-in-keras-even-though-i-set-the-random-seeds)
+- dataset splitting
+    - separate training ans validation at least
 - 2020/04/25 ... made the agents learn with **Q-learning** instead of Reinforce
 - the agents are not learning at all
     - take time to understand [this explanation of policy 

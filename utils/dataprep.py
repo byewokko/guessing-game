@@ -69,6 +69,11 @@ def load_emb_gz(filename, n_items=None):
 
 
 def make_categories(filenames, sep=None):
+    """
+    Extracts categories from a list of file paths, assuming
+    the files are sorted in folders corresponding to their categories.
+    Returns a np.array of category indices.
+    """
     if sep is None:
         sep = os.path.sep
     if len(filenames[0].split(sep)) < 2:
@@ -78,6 +83,17 @@ def make_categories(filenames, sep=None):
     uniq, cat = np.unique(filenames_split, return_inverse=True)
     print(f"{len(uniq)} categories found.")
     return cat
+
+
+def split_dataset(data_length, ratio):
+    ind = np.arange(data_length)
+    np.random.shuffle(ind)
+    ratio = np.asarray(ratio)
+    ratio = ratio / ratio.sum() * data_length
+    splits = [0]
+    for n in ratio:
+        splits.append(splits[-1] + n)
+    out = [ind[ratio[i]:ratio[i + 1]] for i in range(len(ratio))]
 
 
 def reduce_emb(x, n_comp):

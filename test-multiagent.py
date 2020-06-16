@@ -9,7 +9,7 @@ import numpy as np
 import game.game as game
 import agent.q_agent as agent
 # import agent.q_agent as agent
-from utils.embeddings import load_emb_gz, make_categories
+from utils.dataprep import load_emb_gz, make_categories
 from keras.optimizers import Adam, SGD, Adagrad
 import matplotlib.pyplot as plt
 
@@ -19,14 +19,14 @@ log.setLevel(logging.DEBUG)
 
 
 IMG_EMB_FILE = "data/imagenet-4000-vgg19.emb.gz"
-# IMG_EMB_FILE = "data/esp-10000-esp-vgg19.emb.gz"
-# IMG_EMB_FILE = "data/esp-10000-esp-xception.emb.gz"
-N_SYMBOLS = 10
+# IMG_EMB_FILE = "data/esp-10000-vgg19.emb.gz"
+# IMG_EMB_FILE = "data/esp-10000-xception.emb.gz"
+N_SYMBOLS = 100
 N_CHOICES = 2
 EMB_SIZE = 50
 N_IMAGES = None
 BATCH_SIZE = 30
-N_EPISODES = 10000
+N_EPISODES = 15000
 
 _, fnames, embs = load_emb_gz(IMG_EMB_FILE, N_IMAGES)
 categories = make_categories(fnames)
@@ -38,7 +38,9 @@ args = {
     "output_size": N_SYMBOLS,
     "n_symbols": N_SYMBOLS,
     "embedding_size": 50,
-    "learning_rate": 0.01,
+    "learning_rate": 0.002,
+    "use_bias": True,
+    "loss": "mse",
     "optimizer": Adam
 }
 
@@ -82,21 +84,23 @@ success_rate_avg = []
 sendr_loss_avg = None
 recvr_loss_avg = None
 explore = "gibbs"
+gibbs_temperature = 0.001
+explore = False
 sender = agent1
 receiver = agent2
 for i in range(N_EPISODES):
     g.reset()
     sender_state = g.get_sender_state(n_images=N_CHOICES, unique_categories=True)
-    sender_action, _ = sender.act(sender_state, explore=explore)
+    sender_action, _ = sender.act(sender_state, explore=explore, gibbs_temperature=gibbs_temperature)
     receiver_state = g.get_receiver_state(sender_action)
-    receiver_action, _ = receiver.act(receiver_state, explore=explore)
+    receiver_action, _ = receiver.act(receiver_state, explore=explore, gibbs_temperature=gibbs_temperature)
     sender_reward, receiver_reward, success = g.evaluate_guess(receiver_action)
     sender.remember(sender_state, sender_action, sender_reward)
     receiver.remember(receiver_state, receiver_action, receiver_reward)
     batch_success.append(success)
 
-    if i == 6000:
-        explore = False
+    # if i == 6000:
+    #     explore = False
     # TRAIN
     if i and not i % BATCH_SIZE:
         avg_success = sum(batch_success) / len(batch_success)
@@ -138,3 +142,6 @@ for i in range(N_EPISODES):
         ax3.plot(t[-show_steps:], success_rate_avg[-show_steps:], "k")
         fig.canvas.draw()
         fig.canvas.flush_events()
+
+print("Training finished")
+plt.show(block=True)
