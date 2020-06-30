@@ -26,7 +26,7 @@ EXPLORATION_FLOOR = .015
 class Agent:
     input_type = "data"
 
-    def __init__(self, input_shapes, output_size, n_symbols, **kwargs):
+    def __init__(self, input_shapes, output_size, n_symbols, gibbs_temperature=GIBBS_TEMPERATURE, **kwargs):
         self.last_updates = None
         self.n_input_images = 2
         self.input_shapes = input_shapes
@@ -38,6 +38,7 @@ class Agent:
         self.role = None
         self.model = None
         self.model_predict = None
+        self.gibbs_temperature = gibbs_temperature
         self.exploration_rate = EXPLORATION_RATE
         self.exploration_rate_decay = EXPLORATION_DECAY
         self.exploration_min = EXPLORATION_FLOOR
@@ -49,8 +50,12 @@ class Agent:
     def _build_model(self, **kwargs):
         raise NotImplementedError
 
-    def act(self, state, explore="gibbs", gibbs_temperature=0.05):
+    def act(self, state, explore="gibbs", gibbs_temperature=None):
         assert explore in (False, "gibbs", "decay")
+        if gibbs_temperature is None:
+            gibbs_temperature = self.gibbs_temperature
+        else:
+            assert gibbs_temperature > 0
         state = [np.expand_dims(st, 0) for st in state]
         # action = np.zeros(self.output_size)
         act_probs = self.model.predict(state)

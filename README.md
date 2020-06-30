@@ -22,4 +22,4 @@ Part of my master thesis project.
 - dataset splitting
     - separate training ans validation at least
 - exploding weights -> NaN
-    - some hyperparameter setting lead to exploding weights in the bottom (embedding) layers
+    - probably caused by extreme values in the softmax layer
