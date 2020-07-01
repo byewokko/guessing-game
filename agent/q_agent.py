@@ -309,6 +309,12 @@ class MultiAgent(Agent):
         imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
         # imgs = [emb(inputs[i]) for i in range(n_input_images)]  # same embedding layer for all images
 
+        if isinstance(optimizer, str):
+            if optimizer.lower() == "adam":
+                optimizer = optim.Adam
+            else:
+                raise TypeError(f"Unknown optimizer '{optimizer}'")
+
         # Sender part
         concat = layers.concatenate(imgs, axis=-1)
         out = layers.Dense(n_symbols,

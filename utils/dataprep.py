@@ -71,7 +71,11 @@ def load_emb_gz(filename, n_items=None):
 def make_categories(filenames, sep=None):
     """
     Extracts categories from a list of file paths, assuming
-    the files are sorted in folders corresponding to their categories.
+    the files are sorted in folders corresponding to their categories, e.g.:
+    ["path/to/data/category1/image1.png",
+    "path/to/data/category1/image2.png",
+    "path/to/data/category2/image1.png"]
+
     Returns a np.array of category indices.
     """
     if sep is None:
