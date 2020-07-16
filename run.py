@@ -3,6 +3,7 @@ from utils.set_seed import set_seed
 set_seed(0)
 
 import os
+import json5
 from datetime import datetime
 
 TIMESTAMP = datetime.now().strftime("%y%m%d-%H%M%S")
@@ -12,61 +13,15 @@ from game.game import Game
 from agent import q_agent
 from utils.dataprep import load_emb_gz, make_categories
 
-experiment_args = {
-    # Execution mode: "train" or "test"
-    "mode": "train",
-
-    # Directory to load from and save to
-    "model_dir": "models",
-
-    # Weights file to load: file prefix or None (to start with a blank model)
-    "load_file": None,
-
-    # Prefix used for saving weights, result and log files
-    "save_file": f"{TIMESTAMP}-justtesting",
-
-    # Roles mode: "switch" or "fixed"
-    # TODO: add support for simple fixed-role agents
-    "roles": "switch",
-
-    # Number of episodes to play in total
-    "n_episodes": 5000,
-
-    # Number of episodes between updates
-    "batch_size": 30,
-
-    # Path to embedding file
-    "dataset": "data/imagenet-4000-vgg19.emb.gz",
-    # "dataset": "data/esp-10000-vgg19.emb.gz",
-    # "dataset": "data/esp-10000-xception.emb.gz",
-
-    # Number of images to play with (-None- to keep the whole dataset)
-    "trim_dataset_to_n_images": None,
-
-    # Pick images based on categories (generated from the first column in the embedding file)
-    "use_categories": True,
-
-    # Number of symbols that the agents are allowed to use
-    "vocabulary_size": 50,
-
-    # Size of the first layer in the agents' networks
-    "embedding_size": 50,
-
-    # Number of images shown presented in each turn of the game
-    "n_images_to_guess_from": 2,
-
-    # Sender type: "agnostic" or "informed"
-    # TODO: add informed sender as a parameter
-    "sender_type": "agnostic",
-}
+SETTINGS_FILE = "settings.json5"
 
 
-def run_experiment(model_dir, load_file, save_file, mode, roles,
+def run_experiment(model_dir, load_file, save_file, mode,
                    dataset, trim_dataset_to_n_images, use_categories, vocabulary_size,
                    n_images_to_guess_from, **kwargs):
+    save_file = save_file.format(TIMESTAMP=TIMESTAMP)
     print(f"Loading image embeddings from '{dataset}' ...")
-    path2ind, path_list, embeddings = load_emb_gz(dataset,
-                                                  trim_dataset_to_n_images)
+    path2ind, path_list, embeddings = load_emb_gz(dataset, trim_dataset_to_n_images)
     if use_categories:
         categories = make_categories(path_list)
     else:
@@ -87,27 +42,18 @@ def run_experiment(model_dir, load_file, save_file, mode, roles,
         "embedding_size": 50,
         "learning_rate": 0.002,
         "use_bias": True,
-        "loss": "mse",
+        "loss": "binary_crossentropy",
         "optimizer": "adam"
     }
 
     filename = os.path.join(model_dir, save_file)
-    filename = f"{filename}.par.txt"
+    filename = f"{filename}.json5"
     print(f"Writing parameters to '{filename}' ...")
     with open(filename, "w") as f:
-        print(experiment_args, file=f)
-        print(agent_args, file=f)
-        print("", file=f)
+        json5.dump(experiment_args, f, indent="    ")
 
-    if roles == "switch":
-        agent1 = q_agent.MultiAgent(**agent_args, role="sender")
-        agent2 = q_agent.MultiAgent(**agent_args, role="receiver")
-    elif roles == "fixed":
-        agent1 = q_agent.Sender(**agent_args)
-        # agent1 = q_agent.SenderInformed(agent_args)
-        agent2 = q_agent.Receiver(**agent_args)
-    else:
-        raise ValueError(f"Unknown mode: '{roles}'")
+    agent1 = q_agent.MultiAgent(**agent_args, role="sender")
+    agent2 = q_agent.MultiAgent(**agent_args, role="receiver")
 
     if load_file:
         filename = os.path.join(model_dir, load_file)
@@ -133,4 +79,6 @@ def run_experiment(model_dir, load_file, save_file, mode, roles,
 
 
 if __name__ == "__main__":
+    with open(SETTINGS_FILE, "r") as f:
+        experiment_args = json5.load(f)
     run_experiment(**experiment_args)

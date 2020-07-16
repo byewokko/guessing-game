@@ -59,6 +59,8 @@ class Agent:
         state = [np.expand_dims(st, 0) for st in state]
         # action = np.zeros(self.output_size)
         act_probs = self.model.predict(state)
+        if np.any(np.isnan(act_probs)):
+            raise ValueError("probabilities contain NaN")
         act_probs = np.squeeze(act_probs)
         if explore == "gibbs":
             # Sample from Gibbs distribution
@@ -275,9 +277,10 @@ class Receiver(Agent):
 
 
 class MultiAgent(Agent):
-    def __init__(self, role="sender", **kwargs):
+    def __init__(self, role="sender", name="agent", **kwargs):
         super().__init__(**kwargs)
         self.role = None
+        self.name = name
         self.net = {"sender": component.Net(),
                     "receiver": component.Net()}
         self._build_model(**kwargs)
@@ -289,7 +292,7 @@ class MultiAgent(Agent):
 
     def _build_model(self, input_shapes, n_symbols, embedding_size=EMBEDDING_SIZE,
                      use_bias=USE_BIAS, loss=LOSS, optimizer=OPTIMIZER, learning_rate=LEARNING_RATE,
-                     mode="dot", **kwargs):
+                     mode="dot", sender_type="agnostic", **kwargs):
         # Shared part
         n_inputs = len(input_shapes)
         n_input_images = len(input_shapes) - 1
@@ -323,7 +326,7 @@ class MultiAgent(Agent):
                            )(concat)
 
         self.net["sender"].model = Model(inputs, out)
-        self.net["sender"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate))
+        self.net["sender"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate, clipnorm=1.))
         self.net["sender"].input_shapes = input_shapes[:-1]
         self.net["sender"].output_size = n_symbols
         self.net["sender"].reset_batch()
@@ -356,7 +359,7 @@ class MultiAgent(Agent):
         out = layers.Activation("sigmoid")(out)
 
         self.net["receiver"].model = Model([*inputs, sym_input], out)
-        self.net["receiver"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate))
+        self.net["receiver"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate, clipnorm=1.))
         self.net["receiver"].input_shapes = input_shapes
         self.net["receiver"].output_size = n_input_images
         self.net["receiver"].reset_batch()
@@ -380,8 +383,12 @@ class MultiAgent(Agent):
         if explore == "gibbs":
             # Sample from Gibbs distribution
             act_probs_exp = np.exp(act_probs / gibbs_temperature)
-            act_probs = act_probs_exp / act_probs_exp.sum()
-            action = np.random.choice(range(len(act_probs)), 1, p=act_probs)
+            # Random idea:
+            # max_prob = act_probs.max()
+            # act_probs_exp = np.exp(act_probs / max_prob)
+            act_probs_exp = act_probs_exp / act_probs_exp.sum()
+            # print(self.name, self.active_net().model.name, act_probs_exp.min(), act_probs_exp.max())
+            action = np.random.choice(range(len(act_probs_exp)), 1, p=act_probs_exp)
         elif explore == "decay":
             if np.random.rand() > self.exploration_rate:
                 if self.exploration_rate > self.exploration_min:

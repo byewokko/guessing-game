@@ -1,0 +1,41 @@
+{
+  // Execution mode: "train" or "test"
+  "mode": "train",
+  // Directory to load from and save to
+  "model_dir": "models",
+  // Weights file to load: file prefix or -null- (to start with a blank model)
+  "load_file": null,
+  // Prefix used for saving weights, result and log files
+  "save_file": "{TIMESTAMP}-justtesting",
+  // Roles mode: "switch" or "fixed"
+  // TODO: add support for simple fixed-role agents
+  "roles": "switch",
+  // Number of episodes to play in total
+  "n_episodes": 10000,
+  // Number of episodes between updates
+  "batch_size": 30,
+  // Path to embedding file
+  "dataset": "data/imagenet-4000-vgg19.emb.gz",
+  // "dataset": "data/esp-10000-vgg19.emb.gz",
+  // "dataset": "data/esp-10000-xception.emb.gz",
+
+  // Number of images to play with (-null- to keep the whole dataset)
+  "trim_dataset_to_n_images": null,
+  // Pick images based on categories (generated from the first column in the embedding file)
+  "use_categories": true,
+  // Number of symbols that the agents use to communicate
+  "vocabulary_size": 50,
+  // Size of the first layer in the agents' networks
+  "embedding_size": 50,
+  // Number of images shown presented in each turn of the game
+  "n_images_to_guess_from": 2,
+  // Exploration strategy: -False-, "gibbs", or "decay"
+  "explore": "gibbs",
+  // Gibbs temperature value
+  "gibbs_temperature": 0.1,
+  // (tends to crash with values smaller than 0.05)
+
+  // Sender type: "agnostic" or "informed"
+  // TODO: add informed sender as a parameter
+  "sender_type": "agnostic",
+}
