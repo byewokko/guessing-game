@@ -19,7 +19,7 @@ OPTIMIZER = optim.Adam
 LOSS = "mse"
 CNN_FILTERS = 20
 EXPLORATION_RATE = 1.
-EXPLORATION_DECAY = .99
+EXPLORATION_DECAY = .995
 EXPLORATION_FLOOR = .015
 
 
@@ -321,9 +321,12 @@ class MultiAgent(Agent):
         # Sender part
         concat = layers.concatenate(imgs, axis=-1)
         out = layers.Dense(n_symbols,
-                           activation='sigmoid',
+                           # activation='sigmoid',
                            use_bias=use_bias,
                            )(concat)
+
+        out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
+        out = layers.Softmax()(out)
 
         self.net["sender"].model = Model(inputs, out)
         self.net["sender"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate, clipnorm=1.))
@@ -356,7 +359,8 @@ class MultiAgent(Agent):
         else:
             raise ValueError(f"'{mode}' is not a valid mode.")
 
-        out = layers.Activation("sigmoid")(out)
+        out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
+        out = layers.Softmax()(out)
 
         self.net["receiver"].model = Model([*inputs, sym_input], out)
         self.net["receiver"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate, clipnorm=1.))
@@ -382,13 +386,10 @@ class MultiAgent(Agent):
         act_probs = np.squeeze(act_probs)
         if explore == "gibbs":
             # Sample from Gibbs distribution
-            act_probs_exp = np.exp(act_probs / gibbs_temperature)
-            # Random idea:
-            # max_prob = act_probs.max()
-            # act_probs_exp = np.exp(act_probs / max_prob)
-            act_probs_exp = act_probs_exp / act_probs_exp.sum()
-            # print(self.name, self.active_net().model.name, act_probs_exp.min(), act_probs_exp.max())
-            action = np.random.choice(range(len(act_probs_exp)), 1, p=act_probs_exp)
+            # act_probs_exp = np.exp(act_probs / gibbs_temperature)
+            # act_probs_exp = act_probs_exp / act_probs_exp.sum()
+            # action = np.random.choice(range(len(act_probs_exp)), 1, p=act_probs_exp)
+            action = np.random.choice(range(len(act_probs)), 1, p=act_probs)
         elif explore == "decay":
             if np.random.rand() > self.exploration_rate:
                 if self.exploration_rate > self.exploration_min:
@@ -396,6 +397,17 @@ class MultiAgent(Agent):
                 action = np.random.choice(range(len(act_probs)), 1)
             else:
                 action = np.argmax(act_probs)
+        elif explore == "nmax":
+            nmax = 3
+            mask = np.argpartition(act_probs, -nmax)[:-nmax]
+            # TODO: sample from top N symbols
+            act_probs_exp = np.exp(act_probs / gibbs_temperature)
+            # Random idea:
+            # max_prob = act_probs.max()
+            # act_probs_exp = np.exp(act_probs / max_prob)
+            act_probs_exp = act_probs_exp / act_probs_exp.sum()
+            # print(self.name, self.active_net().model.name, act_probs_exp.min(), act_probs_exp.max())
+            action = np.random.choice(range(len(act_probs_exp)), 1, p=act_probs_exp)
         else:
             action = np.argmax(act_probs)
         self.last_action = (state, action, act_probs)

@@ -43,7 +43,8 @@ def run_experiment(model_dir, load_file, save_file, mode,
         "learning_rate": 0.002,
         "use_bias": True,
         "loss": "binary_crossentropy",
-        "optimizer": "adam"
+        "optimizer": "adam",
+        "gibbs_temperature": 0.005
     }
 
     filename = os.path.join(model_dir, save_file)
@@ -52,8 +53,8 @@ def run_experiment(model_dir, load_file, save_file, mode,
     with open(filename, "w") as f:
         json5.dump(experiment_args, f, indent="    ")
 
-    agent1 = q_agent.MultiAgent(**agent_args, role="sender")
-    agent2 = q_agent.MultiAgent(**agent_args, role="receiver")
+    agent1 = q_agent.MultiAgent(name="01", role="sender", **agent_args)
+    agent2 = q_agent.MultiAgent(name="02", role="receiver", **agent_args)
 
     if load_file:
         filename = os.path.join(model_dir, load_file)
@@ -68,6 +69,7 @@ def run_experiment(model_dir, load_file, save_file, mode,
                               **kwargs)
     elif mode == "test":
         raise NotImplementedError("test mode")
+        training.run_test(game, agent1, agent2, n_images_to_guess_from=n_images_to_guess_from, **kwargs)
     else:
         raise ValueError(f"Unknown mode: '{mode}'")
 
