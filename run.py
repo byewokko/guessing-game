@@ -47,6 +47,10 @@ def run_experiment(model_dir, load_file, save_file, mode,
         "gibbs_temperature": 0.005
     }
 
+    for k in ("sender_type", "n_informed_filters", "embedding_size", "learning_rate", "gibbs_temperature"):
+        if k in kwargs:
+            agent_args[k] = kwargs[k]
+
     filename = os.path.join(model_dir, save_file)
     filename = f"{filename}.json5"
     print(f"Writing parameters to '{filename}' ...")

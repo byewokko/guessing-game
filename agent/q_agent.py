@@ -290,7 +290,7 @@ class MultiAgent(Agent):
         assert self.role in self.net.keys()
         return self.net[self.role]
 
-    def _build_model(self, input_shapes, n_symbols, embedding_size=EMBEDDING_SIZE,
+    def _build_model(self, input_shapes, n_symbols, embedding_size=EMBEDDING_SIZE, n_informed_filters=20,
                      use_bias=USE_BIAS, loss=LOSS, optimizer=OPTIMIZER, learning_rate=LEARNING_RATE,
                      mode="dot", sender_type="agnostic", **kwargs):
         # Shared part
@@ -318,13 +318,38 @@ class MultiAgent(Agent):
             else:
                 raise TypeError(f"Unknown optimizer '{optimizer}'")
 
-        # Sender part
-        concat = layers.concatenate(imgs, axis=-1)
-        out = layers.Dense(n_symbols,
-                           # activation='sigmoid',
-                           use_bias=use_bias,
-                           )(concat)
+        if sender_type == "agnostic":
+            concat = layers.concatenate(imgs, axis=-1)
+            out = layers.Dense(n_symbols,
+                               # activation='sigmoid',
+                               use_bias=use_bias,
+                               )(concat)
+        elif sender_type == "informed":
+            stack = layers.Lambda(lambda x: K.stack(x, axis=1), name="stack")
+            reshape = layers.Reshape((-1, embedding_size, 1))
+            feat_filters = layers.Conv2D(filters=n_informed_filters,
+                                         kernel_size=(n_input_images, 1),
+                                         activation="sigmoid",
+                                         # padding="same",
+                                         # strides=embedding_size,
+                                         data_format="channels_last",
+                                         name="feature_filters"
+                                         )
 
+            voc_filter = layers.Conv2D(1, (1, n_informed_filters),
+                                       activation="linear",
+                                       data_format="channels_first",
+                                       name="vocab_filter"
+                                       )
+
+            dense = layers.Dense(n_symbols, name="output_dense")
+
+            # out = dense(layers.Flatten()(voc_filter(feat_filters(reshape(stack(imgs))))))
+            out = dense(layers.Flatten()(voc_filter(feat_filters(reshape(stack(imgs))))))
+        else:
+            raise KeyError(f"Unknown sender type: {sender_type}")
+
+        # Common sender part
         out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
         out = layers.Softmax()(out)
 
@@ -333,6 +358,7 @@ class MultiAgent(Agent):
         self.net["sender"].input_shapes = input_shapes[:-1]
         self.net["sender"].output_size = n_symbols
         self.net["sender"].reset_batch()
+        print(self.net["sender"].model.summary())
 
         # Receiver part
         symbol_shape = input_shapes[-1]
