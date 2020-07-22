@@ -1,14 +1,14 @@
 import numpy as np
 import game.game as game
 import agent.q_agent as agent
+import pandas as pd
 from utils.dataprep import load_emb_gz, make_categories
 from keras.optimizers import Adam, SGD, Adagrad
 import matplotlib.pyplot as plt
 
 
 def run_training(game, agent1, agent2, n_episodes, batch_size, n_images_to_guess_from,
-                 roles="switch", show_plot=True,
-                 explore="gibbs", gibbs_temperature=0.01, **kwargs):
+                 roles="switch", show_plot=True, explore="gibbs", gibbs_temperature=0.01, **kwargs):
     if show_plot:
         fig = plt.figure()
         plt.subplots_adjust(hspace=0.65)
@@ -88,9 +88,16 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, n_images_to_guess
     # plt.show(block=True)
 
 
-def run_test(game, agent1, agent2, n_episodes, batch_size, n_images_to_guess_from,
-             roles="switch", show_plot=True,
-             explore=None, gibbs_temperature=0.01, **kwargs):
+def run_test(game, agent1, agent2, res_file, n_episodes, batch_size, n_active_images,
+             roles="switch", show_plot=False, explore=None, gibbs_temperature=0.01, **kwargs):
+    # Set up the logging of results
+    columns = "sender_name,receiver_name,active_images,target_image,chosen_symbol,chosen_symbol_p,\
+    chosen_image,chosen_image_p,success".replace(" ", "").split(",")
+    results = {k: None for k in columns}
+    df_results = pd.DataFrame(columns=columns)
+    # df_results.set_index("episode", inplace=True)
+
+    # Progress plotting set up
     if show_plot:
         fig = plt.figure()
         plt.subplots_adjust(hspace=0.65)
@@ -113,28 +120,46 @@ def run_test(game, agent1, agent2, n_episodes, batch_size, n_images_to_guess_fro
     sender = agent1
     receiver = agent2
     for i in range(1, n_episodes + 1):
+        # results["episode"] = i
+        results["sender_name"] = sender.get_active_name()
+        results["receiver_name"] = receiver.get_active_name()
         game.reset()
-        sender_state = game.get_sender_state(n_images=n_images_to_guess_from, unique_categories=True)
-        sender_action, _ = sender.act(sender_state, explore=explore, gibbs_temperature=gibbs_temperature)
-        receiver_state = game.get_receiver_state(sender_action)
-        receiver_action, _ = receiver.act(receiver_state, explore=explore, gibbs_temperature=gibbs_temperature)
+        sender_state, img_ids = game.get_sender_state(n_images=n_active_images, unique_categories=True,
+                                                      return_ids=True)
+        results["active_images"] = ":".join([str(x) for x in img_ids])
+        results["target_image"] = img_ids[0]
+        sender_action, sender_action_probs = sender.act(sender_state, explore=explore,
+                                                        gibbs_temperature=gibbs_temperature)
+        results["chosen_symbol"] = sender_action
+        results["chosen_symbol_p"] = sender_action_probs[sender_action]
+        receiver_state, img_ids = game.get_receiver_state(sender_action, return_ids=True)
+        receiver_action, receiver_action_probs = receiver.act(receiver_state, explore=explore,
+                                                              gibbs_temperature=gibbs_temperature)
+        results["chosen_image"] = img_ids[receiver_action]
+        results["chosen_image_p"] = receiver_action_probs[receiver_action]
         sender_reward, receiver_reward, success = game.evaluate_guess(receiver_action)
         sender.remember(sender_state, sender_action, sender_reward)
         receiver.remember(receiver_state, receiver_action, receiver_reward)
+        results["success"] = int(success)
         batch_success.append(success)
+        df_results = df_results.append(results, ignore_index=True)
 
         if not i % batch_size:
-            avg_success = sum(batch_success) / len(batch_success)
-            batch_success = []
-            sender.batch_train()
-            receiver.batch_train()
-
             if roles == "switch":
                 sender.switch_role()
                 receiver.switch_role()
                 tmp = sender
                 sender = receiver
                 receiver = tmp
+
+        if not i % 200:
+            avg_success = df_results[-200:]["success"].sum() / 200
+            print(f"Episode {i}, average success: {avg_success}")
+            batch_success = []
+            sender.batch_train()
+            receiver.batch_train()
+
+            continue
 
             # PLOT PROGRESS
             t.append(i)
@@ -166,5 +191,6 @@ def run_test(game, agent1, agent2, n_episodes, batch_size, n_images_to_guess_fro
             fig.canvas.draw()
             fig.canvas.flush_events()
 
-    print("Training finished")
+    df_results.to_csv(res_file, line_terminator="\n")
+    print("Test finished")
     # plt.show(block=True)

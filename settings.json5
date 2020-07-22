@@ -39,7 +39,7 @@
     "embedding_size": 50,
 
 //   Number of images presented in each turn of the game
-    "n_images_to_guess_from": 2,
+    "n_active_images": 2,
 
 //   Exploration strategy: -false-, "gibbs", or "decay"
     "explore": "gibbs",
@@ -49,10 +49,12 @@
 //   FIXME: this value is being overridden by the agent_args dict
 
 //   Sender type: "agnostic" or "informed"
-//   TODO: add informed sender as a parameter
-//    "sender_type": "agnostic",
-    "sender_type": "informed",
+    "sender_type": "agnostic",
+//    "sender_type": "informed",
 
 //   Number of CNN filters used by the informed sender
     "n_informed_filters": 20,
+
+//   Agent loss function
+    "loss": "binary_crossentropy",
 }

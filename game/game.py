@@ -61,7 +61,7 @@ class Game:
         self.episode += 1
         return success
 
-    def get_sender_state(self, n_images=2, unique_categories=False):
+    def get_sender_state(self, n_images=2, unique_categories=False, return_ids=False):
         if unique_categories and self.categories is not None:
             self.sample_ctgs = np.random.choice(a=self.categories, size=n_images, replace=False)
             self.sample_ids = np.zeros(n_images, dtype="int32")
@@ -74,17 +74,20 @@ class Game:
         log.debug(f"Picked images {self.sample_ids}. Correct {self.correct_id}.")
         sender_state = self.images[self.sample_ids]
 
+        if return_ids:
+            return sender_state, self.sample_ids
+        return sender_state
+
+    def get_receiver_state(self, sender_action, return_ids=False):
         # Prepare receiver setup
         np.random.shuffle(self.sample_ids)
         receiver_images = self.images[self.sample_ids]
         self.correct_pos_receiver = np.where(self.sample_ids == self.correct_id)[0]
 
-        return sender_state
-
-    def get_receiver_state(self, sender_action):
-        receiver_images = self.images[self.sample_ids]
         log.debug("Receiving... ")
         receiver_state = [*receiver_images, sender_action]
+        if return_ids:
+            return receiver_state, self.sample_ids
         return receiver_state
 
     def evaluate_guess(self, receiver_action):

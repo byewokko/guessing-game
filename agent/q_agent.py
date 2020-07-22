@@ -321,17 +321,15 @@ class MultiAgent(Agent):
         if sender_type == "agnostic":
             concat = layers.concatenate(imgs, axis=-1)
             out = layers.Dense(n_symbols,
-                               # activation='sigmoid',
                                use_bias=use_bias,
                                )(concat)
         elif sender_type == "informed":
+            # FIXME: informed sender is not learning
             stack = layers.Lambda(lambda x: K.stack(x, axis=1), name="stack")
             reshape = layers.Reshape((-1, embedding_size, 1))
             feat_filters = layers.Conv2D(filters=n_informed_filters,
                                          kernel_size=(n_input_images, 1),
                                          activation="sigmoid",
-                                         # padding="same",
-                                         # strides=embedding_size,
                                          data_format="channels_last",
                                          name="feature_filters"
                                          )
@@ -358,7 +356,6 @@ class MultiAgent(Agent):
         self.net["sender"].input_shapes = input_shapes[:-1]
         self.net["sender"].output_size = n_symbols
         self.net["sender"].reset_batch()
-        print(self.net["sender"].model.summary())
 
         # Receiver part
         symbol_shape = input_shapes[-1]
@@ -464,3 +461,6 @@ class MultiAgent(Agent):
             name = f"model-{time}"
         self.net["sender"].model.save_weights(f"{name}.snd")
         self.net["receiver"].model.save_weights(f"{name}.rcv")
+
+    def get_active_name(self):
+        return f"{self.name}.{self.role}"
