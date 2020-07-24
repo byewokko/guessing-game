@@ -378,7 +378,7 @@ class MultiAgent(Agent):
 
         # mode = "dot"
         if mode == "dot":
-            sig = layers.Activation("sigmoid")  # trains much better with this layer
+            # sig = layers.Activation("sigmoid")
             dot = layers.Dot(axes=1)
             # dot_prods = [dot([sig(img), sig(symbol)]) for img in imgs]
             dot_prods = [dot([img, symbol]) for img in imgs]
