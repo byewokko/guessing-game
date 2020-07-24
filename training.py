@@ -37,8 +37,10 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, n_images_to_guess
         receiver_state = game.get_receiver_state(sender_action)
         receiver_action, _ = receiver.act(receiver_state, explore=explore, gibbs_temperature=gibbs_temperature)
         sender_reward, receiver_reward, success = game.evaluate_guess(receiver_action)
+
         sender.remember(sender_state, sender_action, sender_reward)
         receiver.remember(receiver_state, receiver_action, receiver_reward)
+
         batch_success.append(success)
 
         if not i % batch_size:
@@ -138,8 +140,7 @@ def run_test(game, agent1, agent2, res_file, n_episodes, batch_size, n_active_im
         results["chosen_image"] = img_ids[receiver_action]
         results["chosen_image_p"] = receiver_action_probs[receiver_action]
         sender_reward, receiver_reward, success = game.evaluate_guess(receiver_action)
-        sender.remember(sender_state, sender_action, sender_reward)
-        receiver.remember(receiver_state, receiver_action, receiver_reward)
+
         results["success"] = int(success)
         batch_success.append(success)
         df_results = df_results.append(results, ignore_index=True)

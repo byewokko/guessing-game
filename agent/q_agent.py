@@ -1,5 +1,6 @@
 import numpy as np
 from datetime import datetime as dt
+from collections import deque
 from keras.models import Model
 import keras.layers as layers
 import keras.optimizers as optim
@@ -21,6 +22,7 @@ CNN_FILTERS = 20
 EXPLORATION_RATE = 1.
 EXPLORATION_DECAY = .995
 EXPLORATION_FLOOR = .015
+MAX_MEMORY = 2000
 
 
 class Agent:
@@ -105,6 +107,12 @@ class Agent:
             q_values
         )
         self.reset_batch()
+
+    def trim_memory(self, length=MAX_MEMORY):
+        for i in range(len(self.batch_states)):
+            self.batch_states[i] = self.batch_states[i][-length:]
+        self.batch_rewards = self.batch_rewards[-length:]
+        self.batch_actions = self.batch_actions[-length:]
 
     def reset_batch(self):
         self.batch_states = [[] for _ in self.input_shapes]
@@ -309,8 +317,8 @@ class MultiAgent(Agent):
                            use_bias=use_bias,
                            name=f"embed_img")
 
-        imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
-        # imgs = [emb(inputs[i]) for i in range(n_input_images)]  # same embedding layer for all images
+        # imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
+        imgs = [emb(inputs[i]) for i in range(n_input_images)]  # same embedding layer for all images
 
         if isinstance(optimizer, str):
             if optimizer.lower() == "adam":
@@ -349,8 +357,8 @@ class MultiAgent(Agent):
             raise KeyError(f"Unknown sender type: {sender_type}")
 
         # Common sender part
-        # out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
-        # out = layers.Softmax()(out)
+        out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
+        out = layers.Softmax()(out)
         # out = layers.Activation("sigmoid")(out)
 
         self.net["sender"].model = Model(inputs, out)
@@ -366,24 +374,26 @@ class MultiAgent(Agent):
         emb_sym = layers.Embedding(input_dim=n_symbols,
                                    output_dim=embedding_size,
                                    name=f"embed_sym")
-        flat = layers.Flatten()
-        symbol = flat(emb_sym(sym_input))
+        symbol = layers.Flatten()(emb_sym(sym_input))
 
+        # mode = "dot"
         if mode == "dot":
+            sig = layers.Activation("sigmoid")  # trains much better with this layer
             dot = layers.Dot(axes=1)
+            # dot_prods = [dot([sig(img), sig(symbol)]) for img in imgs]
             dot_prods = [dot([img, symbol]) for img in imgs]
             out = layers.concatenate(dot_prods, axis=-1)
         elif mode == "dense":
             out = layers.concatenate([*imgs, symbol], axis=-1)
-            out = layers.Dense(embedding_size,
+            out = layers.Dense(n_input_images,
                                activation="sigmoid",
                                # kernel_initializer=init.glorot_uniform(seed=42),
                                name=f"dense_join")(out)
         else:
             raise ValueError(f"'{mode}' is not a valid mode.")
 
-        # out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
-        # out = layers.Softmax()(out)
+        out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
+        out = layers.Softmax()(out)
         # out = layers.Activation("sigmoid")(out)
 
         self.net["receiver"].model = Model([*inputs, sym_input], out)

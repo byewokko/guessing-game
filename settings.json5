@@ -12,8 +12,8 @@
     "save_file": "{TIMESTAMP}-nocatg",
 
 //   Roles mode: "switch" or "fixed"
-//  "roles": "switch",
-    "roles": "fixed",
+    "roles": "switch",
+//    "roles": "fixed",
 
 //   Number of episodes to play in total
     "n_episodes": 10000,
@@ -56,8 +56,8 @@
     "n_informed_filters": 20,
 
 //   Agent loss function
-//    "loss": "binary_crossentropy",
-    "loss": "mse"
+    "loss": "binary_crossentropy",
+//    "loss": "mse"
 
 //    learning_rate: 0.001
 }
