@@ -319,7 +319,8 @@ class MultiAgent(Agent):
                 raise TypeError(f"Unknown optimizer '{optimizer}'")
 
         if sender_type == "agnostic":
-            concat = layers.concatenate(imgs, axis=-1)
+            out = [layers.Activation("sigmoid")(imgs[i]) for i in range(n_input_images)]
+            concat = layers.concatenate(out, axis=-1)
             out = layers.Dense(n_symbols,
                                use_bias=use_bias,
                                )(concat)
@@ -348,11 +349,13 @@ class MultiAgent(Agent):
             raise KeyError(f"Unknown sender type: {sender_type}")
 
         # Common sender part
-        out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
-        out = layers.Softmax()(out)
+        # out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
+        # out = layers.Softmax()(out)
+        # out = layers.Activation("sigmoid")(out)
 
         self.net["sender"].model = Model(inputs, out)
-        self.net["sender"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate, clipnorm=1.))
+        # self.net["sender"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate, clipnorm=1.))
+        self.net["sender"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate))
         self.net["sender"].input_shapes = input_shapes[:-1]
         self.net["sender"].output_size = n_symbols
         self.net["sender"].reset_batch()
@@ -373,20 +376,19 @@ class MultiAgent(Agent):
         elif mode == "dense":
             out = layers.concatenate([*imgs, symbol], axis=-1)
             out = layers.Dense(embedding_size,
-                               # activation=layers.PReLU(),
+                               activation="sigmoid",
                                # kernel_initializer=init.glorot_uniform(seed=42),
                                name=f"dense_join")(out)
-            out = layers.Dense(len(imgs),
-                               # kernel_initializer=init.glorot_uniform(seed=42),
-                               name=f"dense_out")(out)
         else:
             raise ValueError(f"'{mode}' is not a valid mode.")
 
-        out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
-        out = layers.Softmax()(out)
+        # out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
+        # out = layers.Softmax()(out)
+        # out = layers.Activation("sigmoid")(out)
 
         self.net["receiver"].model = Model([*inputs, sym_input], out)
-        self.net["receiver"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate, clipnorm=1.))
+        # self.net["receiver"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate, clipnorm=1.))
+        self.net["receiver"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate))
         self.net["receiver"].input_shapes = input_shapes
         self.net["receiver"].output_size = n_input_images
         self.net["receiver"].reset_batch()
@@ -401,7 +403,7 @@ class MultiAgent(Agent):
         else:
             self.set_role("sender")
 
-    def act(self, state, explore="gibbs", gibbs_temperature=0.05):
+    def act(self, state, explore=False, gibbs_temperature=0.05):
         assert explore in (False, "gibbs", "decay")
         state = [np.expand_dims(st, 0) for st in state]
         # action = np.zeros(self.output_size)
@@ -409,10 +411,11 @@ class MultiAgent(Agent):
         act_probs = np.squeeze(act_probs)
         if explore == "gibbs":
             # Sample from Gibbs distribution
-            # act_probs_exp = np.exp(act_probs / gibbs_temperature)
-            # act_probs_exp = act_probs_exp / act_probs_exp.sum()
-            # action = np.random.choice(range(len(act_probs_exp)), 1, p=act_probs_exp)
-            action = np.random.choice(range(len(act_probs)), 1, p=act_probs)
+            act_probs_log = np.log(act_probs)
+            act_probs_exp = np.exp(act_probs_log / self.gibbs_temperature)
+            act_probs_exp = act_probs_exp / act_probs_exp.sum()
+            action = np.random.choice(range(len(act_probs_exp)), 1, p=act_probs_exp)
+            # action = np.random.choice(range(len(act_probs)), 1, p=act_probs)
         elif explore == "decay":
             if np.random.rand() > self.exploration_rate:
                 if self.exploration_rate > self.exploration_min:

@@ -155,41 +155,6 @@ def run_test(game, agent1, agent2, res_file, n_episodes, batch_size, n_active_im
         if not i % 200:
             avg_success = df_results[-200:]["success"].sum() / 200
             print(f"Episode {i}, average success: {avg_success}")
-            batch_success = []
-            sender.batch_train()
-            receiver.batch_train()
-
-            continue
-
-            # PLOT PROGRESS
-            t.append(i)
-            success_rate.append(avg_success)
-            success_rate_avg.append(sum(success_rate[-10:]) / min(10, len(success_rate)))
-            sendr1_loss.append(agent1.net["sender"].last_loss)
-            sendr2_loss.append(agent2.net["sender"].last_loss)
-            recvr1_loss.append(agent1.net["receiver"].last_loss)
-            recvr2_loss.append(agent2.net["receiver"].last_loss)
-            if not i % (50 * batch_size):
-                print(f"Episode {i}")
-                print(f"Batch success rate {success_rate_avg[-1]}")
-            if not show_plot:
-                continue
-            ax1.clear()
-            ax2.clear()
-            ax3.clear()
-            ax1.set_title("Sender loss")
-            ax2.set_title("Receiver loss")
-            ax3.set_title("Average batch success rate")
-            ax1.plot(t[-show_steps:], sendr1_loss[-show_steps:], "m", label="Agent 1")
-            ax1.plot(t[-show_steps:], sendr2_loss[-show_steps:], "c", label="Agent 2")
-            ax1.legend(loc="lower left")
-            ax2.plot(t[-show_steps:], recvr1_loss[-show_steps:], "m", label="Agent 1")
-            ax2.plot(t[-show_steps:], recvr2_loss[-show_steps:], "c", label="Agent 2")
-            ax2.legend(loc="lower left")
-            ax3.plot(t[-show_steps:], success_rate[-show_steps:], "r.")
-            ax3.plot(t[-show_steps:], success_rate_avg[-show_steps:], "k")
-            fig.canvas.draw()
-            fig.canvas.flush_events()
 
     df_results.to_csv(res_file, line_terminator="\n")
     print("Test finished")
