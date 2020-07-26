@@ -333,7 +333,6 @@ class MultiAgent(Agent):
                                use_bias=use_bias,
                                )(concat)
         elif sender_type == "informed":
-            # FIXME: informed sender is not learning
             stack = layers.Lambda(lambda x: K.stack(x, axis=1), name="stack")
             reshape = layers.Reshape((-1, embedding_size, 1))
             feat_filters = layers.Conv2D(filters=n_informed_filters,
@@ -421,11 +420,11 @@ class MultiAgent(Agent):
         act_probs = np.squeeze(act_probs)
         if explore == "gibbs":
             # Sample from Gibbs distribution
-            act_probs_log = np.log(act_probs)
-            act_probs_exp = np.exp(act_probs_log / self.gibbs_temperature)
-            act_probs_exp = act_probs_exp / act_probs_exp.sum()
-            action = np.random.choice(range(len(act_probs_exp)), 1, p=act_probs_exp)
-            # action = np.random.choice(range(len(act_probs)), 1, p=act_probs)
+            # act_probs_log = np.log(act_probs)
+            # act_probs_exp = np.exp(act_probs_log / self.gibbs_temperature)
+            # act_probs_exp = act_probs_exp / act_probs_exp.sum()
+            # action = np.random.choice(range(len(act_probs_exp)), 1, p=act_probs_exp)
+            action = np.random.choice(range(len(act_probs)), 1, p=act_probs)
         elif explore == "decay":
             if np.random.rand() > self.exploration_rate:
                 if self.exploration_rate > self.exploration_min:

@@ -6,6 +6,8 @@ from utils.dataprep import load_emb_gz, make_categories
 from keras.optimizers import Adam, SGD, Adagrad
 import matplotlib.pyplot as plt
 
+from utils.plot import plot_colourline
+
 
 def run_training(game, agent1, agent2, n_episodes, batch_size, n_images_to_guess_from,
                  roles="switch", show_plot=True, explore="gibbs", gibbs_temperature=0.01, **kwargs):
@@ -28,6 +30,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, n_images_to_guess
     sendr2_loss = []
     recvr2_loss = []
     success_rate_avg = []
+    success_rate_variance = []
     sender = agent1
     receiver = agent2
     for i in range(1, n_episodes + 1):
@@ -60,6 +63,8 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, n_images_to_guess
             t.append(i)
             success_rate.append(avg_success)
             success_rate_avg.append(sum(success_rate[-10:]) / min(10, len(success_rate)))
+            success_rate_variance.append(
+                sum([(x - success_rate_avg[-1])**2 for x in success_rate[-10:]]) / min(10, len(success_rate)))
             sendr1_loss.append(agent1.net["sender"].last_loss)
             sendr2_loss.append(agent2.net["sender"].last_loss)
             recvr1_loss.append(agent1.net["receiver"].last_loss)
@@ -82,7 +87,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, n_images_to_guess
             ax2.plot(t[-show_steps:], recvr2_loss[-show_steps:], "c", label="Agent 2")
             ax2.legend(loc="lower left")
             ax3.plot(t[-show_steps:], success_rate[-show_steps:], "r.")
-            ax3.plot(t[-show_steps:], success_rate_avg[-show_steps:], "k")
+            plot_colourline(t[-show_steps:], success_rate_avg[-show_steps:], success_rate_variance[-show_steps:], ax3)
             fig.canvas.draw()
             fig.canvas.flush_events()
 

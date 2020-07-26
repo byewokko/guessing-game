@@ -12,8 +12,8 @@
     "save_file": "{TIMESTAMP}-nocatg",
 
 //   Roles mode: "switch" or "fixed"
-    "roles": "switch",
-//    "roles": "fixed",
+//    "roles": "switch",
+    "roles": "fixed",
 
 //   Number of episodes to play in total
     "n_episodes": 10000,
@@ -49,8 +49,8 @@
     "gibbs_temperature": 0.1,
 
 //   Sender type: "agnostic" or "informed"
-    "sender_type": "agnostic",
-//    "sender_type": "informed",
+//    "sender_type": "agnostic",
+    "sender_type": "informed",
 
 //   Number of CNN filters used by the informed sender
     "n_informed_filters": 20,
