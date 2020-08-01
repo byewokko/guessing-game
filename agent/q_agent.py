@@ -351,6 +351,7 @@ class MultiAgent(Agent):
             dense = layers.Dense(n_symbols, name="output_dense")
 
             # out = dense(layers.Flatten()(voc_filter(feat_filters(reshape(stack(imgs))))))
+            # out = layers.Flatten()(voc_filter(feat_filters(reshape(stack(imgs)))))
             out = dense(layers.Flatten()(voc_filter(feat_filters(reshape(stack(imgs))))))
         else:
             raise KeyError(f"Unknown sender type: {sender_type}")

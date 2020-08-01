@@ -9,7 +9,7 @@
     "load_file": null,
 
 //   Prefix used for saving weights, result and log files
-    "save_file": "{TIMESTAMP}-nocatg",
+    "save_file": "{TIMESTAMP}-fixed-noexplore",
 
 //   Roles mode: "switch" or "fixed"
 //    "roles": "switch",
@@ -46,11 +46,11 @@
     explore: false,
 
 //   Gibbs temperature value
-    "gibbs_temperature": 0.1,
+    "gibbs_temperature": 1,
 
 //   Sender type: "agnostic" or "informed"
-//    "sender_type": "agnostic",
-    "sender_type": "informed",
+    "sender_type": "agnostic",
+//    "sender_type": "informed",
 
 //   Number of CNN filters used by the informed sender
     "n_informed_filters": 20,

@@ -20,10 +20,10 @@ log.setLevel(logging.DEBUG)
 logging.basicConfig(level=logging.DEBUG)
 
 #IMG_PATH = "D:/Pracant/Desktop/ESPGame100k/originals"
-IMG_PATH = "F:/imagenet_images"
+IMG_PATH = "E:/TMP/imagenet_images"
 IMG_SHAPE = (224, 224, 3)  # for VGG
 # IMG_SHAPE = (299, 299, 3)  # for Xception
-OUT_NAME = "../data/big/imagenet-4000-esp-vgg19.emb.gz"
+OUT_NAME = "../data/big/imagenet-227x80-vgg19.emb"
 OUT_DIM = 50
 BATCH_SIZE = 16
 
