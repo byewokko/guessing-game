@@ -30,12 +30,13 @@ with open(data_file) as fin:
     img_buff = []
     ctgs = []
     for line in fin:
-        line = line.strip().replace("\\ ", "_")
+        line = line.replace("\\ ", "_")
         ctg = line.split("\\")[-2]
         if not ctgs:
             ctgs.append(ctg)
         elif ctgs[-1] != ctg:
-            if len(ctgs) <= test_ctgs:
+            print(ctg)
+            if len(ctgs) < test_ctgs:
                 test_ctg_count += len(img_buff)
                 test_ctg_out.writelines(img_buff)
             else:

@@ -1,63 +1,66 @@
 {
-//   Execution mode: "train" or "test"
-    "mode": "train",
+//  Execution mode: "train" or "test"
+    mode: "train",
 
-//   Directory to load from and save to
-    "model_dir": "models",
+//  Directory to load from and save to
+    model_dir: "models",
 
-//   Weights file to load: file prefix or -null- (to start with a blank model)
-    "load_file": null,
+//  Weights file to load: file prefix or -null- (to start with a blank model)
+    load_file: null,
 
-//   Prefix used for saving weights, result and log files
-    "save_file": "{TIMESTAMP}-fixed-noexplore",
+//  Prefix used for saving weights, result and log files
+    save_file: "{TIMESTAMP}-fixed-noexplore",
 
-//   Roles mode: "switch" or "fixed"
-//    "roles": "switch",
-    "roles": "fixed",
+//  Roles mode: "switch" or "fixed"
+//    roles: "switch",
+    roles: "fixed",
 
-//   Number of episodes to play in total
-    "n_episodes": 10000,
+//  Number of episodes to play in total
+    n_episodes: 10000,
 
-//   Number of episodes between updates
-    "batch_size": 30,
+//  Number of episodes between updates
+    batch_size: 30,
 
-//   Path to embedding file
-    "dataset": "data/imagenet-4000-vgg19.emb.gz",
-//   "dataset": "data/esp-10000-vgg19.emb.gz",
-  // "dataset": "data/esp-10000-xception.emb.gz",
+//  Path to embedding file
+//    dataset: "data/imagenet-4000-vgg19.emb.gz",
+    dataset: "data/imagenet-200x65-vgg19.train.emb.gz",
+//    dataset: "data/imagenet-200x15-vgg19.test-img.emb.gz",
+//    dataset: "data/imagenet-27x80-vgg19.test-ctg.emb.gz",
+//    dataset: "data/esp-10000-vgg19.emb.gz",
+//    dataset: "data/esp-10000-xception.emb.gz",
 
-//   Number of images to play with (-null- to keep the whole dataset)
-    "trim_dataset_to_n_images": null,
+//  Number of images to play with (-null- to keep the whole dataset)
+    trim_dataset_to_n_images: null,
 
-//   Pick images based on categories (generated from the first column in the embedding file)
-    "use_categories": true,
+//  Pick images based on categories (generated from the first column in the embedding file)
+    use_categories: true,
 
-//   Number of symbols that the agents use to communicate
-    "vocabulary_size": 50,
+//  Number of symbols that the agents use to communicate
+    vocabulary_size: 50,
 
-//   Size of the first layer in the agents' networks
-    "embedding_size": 50,
+//  Size of the first layer in the agents' networks
+    embedding_size: 50,
 
-//   Number of images presented in each turn of the game
-    "n_active_images": 2,
+//  Number of images presented in each turn of the game
+    n_active_images: 2,
 
-//   Exploration strategy: -false-, "gibbs", or "decay"
-//    "explore": "gibbs",
+//  Exploration strategy: -false-, "gibbs", or "decay"
+//    explore: "gibbs",
     explore: false,
 
-//   Gibbs temperature value
-    "gibbs_temperature": 1,
+//  Gibbs temperature value
+    gibbs_temperature: 1,
 
-//   Sender type: "agnostic" or "informed"
-    "sender_type": "agnostic",
-//    "sender_type": "informed",
+//  Sender type: "agnostic" or "informed"
+//    sender_type: "agnostic",
+    sender_type: "informed",
 
-//   Number of CNN filters used by the informed sender
-    "n_informed_filters": 20,
+//  Number of CNN filters used by the informed sender
+    n_informed_filters: 20,
 
-//   Agent loss function
-    "loss": "binary_crossentropy",
-//    "loss": "mse"
+//  Agent loss function
+    loss: "binary_crossentropy",
+//    loss: "mse"
 
-//    learning_rate: 0.001
+//    learning_rate: 0.001,
 }
