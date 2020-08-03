@@ -5,7 +5,7 @@ import numpy as np
 def plot_colourline(x, y, c, ax, linewidth=2):
     # print(c)
     c = np.asarray(c)
-    c = (c-np.min(c))/((np.max(c)-np.min(c)) or 1)
+    c = (c-np.nanmin(c))/((np.nanmax(c)-np.nanmin(c)) or 1)
     # print(c)
     c = plt.cm.get_cmap("bone")(c)
     for i in np.arange(len(x)-1):

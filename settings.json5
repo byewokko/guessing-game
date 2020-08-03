@@ -9,14 +9,14 @@
     load_file: null,
 
 //  Prefix used for saving weights, result and log files
-    save_file: "{TIMESTAMP}-fixed-noexplore",
+    save_file: "{TIMESTAMP}-basic",
 
 //  Roles mode: "switch" or "fixed"
 //    roles: "switch",
     roles: "fixed",
 
 //  Number of episodes to play in total
-    n_episodes: 10000,
+    n_episodes: 20000,
 
 //  Number of episodes between updates
     batch_size: 30,
@@ -47,13 +47,14 @@
 //  Exploration strategy: -false-, "gibbs", or "decay"
 //    explore: "gibbs",
     explore: false,
+//    explore: "decay",
 
 //  Gibbs temperature value
     gibbs_temperature: 1,
 
 //  Sender type: "agnostic" or "informed"
-//    sender_type: "agnostic",
-    sender_type: "informed",
+    sender_type: "agnostic",
+//    sender_type: "informed",
 
 //  Number of CNN filters used by the informed sender
     n_informed_filters: 20,

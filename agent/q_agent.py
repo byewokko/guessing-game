@@ -357,8 +357,9 @@ class MultiAgent(Agent):
             raise KeyError(f"Unknown sender type: {sender_type}")
 
         # Common sender part
-        out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
-        out = layers.Softmax()(out)
+        if self.gibbs_temperature != 1:
+            out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
+        out = layers.Activation("softmax")(out)
         # out = layers.Activation("sigmoid")(out)
 
         self.net["sender"].model = Model(inputs, out)
@@ -376,7 +377,7 @@ class MultiAgent(Agent):
                                    name=f"embed_sym")
         symbol = layers.Flatten()(emb_sym(sym_input))
 
-        # mode = "dot"
+        mode = "dense"
         if mode == "dot":
             # sig = layers.Activation("sigmoid")
             dot = layers.Dot(axes=1)
@@ -392,8 +393,9 @@ class MultiAgent(Agent):
         else:
             raise ValueError(f"'{mode}' is not a valid mode.")
 
-        out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
-        out = layers.Softmax()(out)
+        if self.gibbs_temperature != 1:
+            out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
+        out = layers.Activation("softmax")(out)
         # out = layers.Activation("sigmoid")(out)
 
         self.net["receiver"].model = Model([*inputs, sym_input], out)

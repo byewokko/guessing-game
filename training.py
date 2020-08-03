@@ -22,7 +22,8 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, n_images_to_guess
         fig.canvas.draw()
 
     t = []
-    show_steps = 2500
+    show_steps = 200
+    window = 20
     batch_success = []
     success_rate = []
     sendr1_loss = []
@@ -62,14 +63,18 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, n_images_to_guess
             # PLOT PROGRESS
             t.append(i)
             success_rate.append(avg_success)
-            success_rate_avg.append(sum(success_rate[-10:]) / min(10, len(success_rate)))
-            success_rate_variance.append(
-                sum([(x - success_rate_avg[-1])**2 for x in success_rate[-10:]]) / min(10, len(success_rate)))
+            if len(success_rate) < window:
+                success_rate_avg.append(np.nan)
+                success_rate_variance.append(np.nan)
+            else:
+                success_rate_avg.append(sum(success_rate[-window:]) / window)
+                success_rate_variance.append(
+                    sum([(x - success_rate_avg[-1])**2 for x in success_rate[-window:]]) / window)
             sendr1_loss.append(agent1.net["sender"].last_loss)
             sendr2_loss.append(agent2.net["sender"].last_loss)
             recvr1_loss.append(agent1.net["receiver"].last_loss)
             recvr2_loss.append(agent2.net["receiver"].last_loss)
-            if not i % (50 * batch_size):
+            if not i % 50:
                 print(f"Episode {i}")
                 print(f"Batch success rate {success_rate_avg[-1]}")
             if not show_plot:
