@@ -64,4 +64,8 @@
 //    loss: "mse"
 
 //    learning_rate: 0.001,
+
+    batch_sampling: "sample",
+
+    memory_sampling_distribution: "linear",
 }

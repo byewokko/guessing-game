@@ -9,8 +9,11 @@ import matplotlib.pyplot as plt
 from utils.plot import plot_colourline
 
 
-def run_training(game, agent1, agent2, n_episodes, batch_size, n_images_to_guess_from,
-                 roles="switch", show_plot=True, explore="gibbs", gibbs_temperature=0.01, **kwargs):
+def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_images_to_guess_from,
+                 roles="switch", show_plot=True, explore="gibbs", gibbs_temperature=0.01,
+                 memory_sampling_distribution="", **kwargs):
+    agent1.make_distribution(memory_sampling_distribution)
+    agent2.make_distribution(memory_sampling_distribution)
     if show_plot:
         fig = plt.figure()
         plt.subplots_adjust(hspace=0.65)
@@ -50,7 +53,9 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, n_images_to_guess
         if not i % batch_size:
             avg_success = sum(batch_success) / len(batch_success)
             batch_success = []
+            sender.prepare_batch(batch_size, batch_mode)
             sender.batch_train()
+            receiver.prepare_batch(batch_size, batch_mode)
             receiver.batch_train()
 
             if roles == "switch":

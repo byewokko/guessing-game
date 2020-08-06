@@ -1,16 +1,11 @@
 import numpy as np
 from datetime import datetime as dt
-from collections import deque
 from keras.models import Model
 import keras.layers as layers
 import keras.optimizers as optim
 import keras.backend as K
-import keras.initializers as init
-from keras.losses import categorical_crossentropy
-from keras.regularizers import l2
 
 from agent import component
-from utils.debug import print_layer
 
 GIBBS_TEMPERATURE = 0.05
 USE_BIAS = True
@@ -25,10 +20,23 @@ EXPLORATION_FLOOR = .015
 MAX_MEMORY = 2000
 
 
+def make_distribution(length: int, mode: str = "linear"):
+    assert length > 0
+    d = np.linspace(0, 1, length)
+    if mode == "linear":
+        return d / d.sum()
+    if mode == "quadratic":
+        d = d * d
+        return d / d.sum()
+    else:
+        raise ValueError(f"Invalid mode: '{mode}'")
+
+
 class Agent:
     input_type = "data"
 
-    def __init__(self, input_shapes, output_size, n_symbols, gibbs_temperature=GIBBS_TEMPERATURE, **kwargs):
+    def __init__(self, input_shapes, output_size, n_symbols, gibbs_temperature=GIBBS_TEMPERATURE, max_memory=MAX_MEMORY,
+                 **kwargs):
         self.last_updates = None
         self.n_input_images = 2
         self.input_shapes = input_shapes
@@ -47,7 +55,13 @@ class Agent:
         self.batch_states = None
         self.batch_actions = None
         self.batch_rewards = None
+        self.memory_states = None
+        self.memory_actions = None
+        self.memory_rewards = None
+        self.max_memory = max_memory
         self.reset_batch()
+        self.reset_memory()
+        self.memory_sampling_dist = make_distribution(self.max_memory, "quadratic")
 
     def _build_model(self, **kwargs):
         raise NotImplementedError
@@ -92,11 +106,11 @@ class Agent:
 
     def remember(self, state, action, reward):
         for i in range(len(state)):
-            self.batch_states[i].append(state[i])
+            self.memory_states[i].append(state[i])
         action_onehot = np.zeros([self.output_size])
         action_onehot[action] = 1
-        self.batch_actions.append(action_onehot)
-        self.batch_rewards.append(reward)
+        self.memory_actions.append(action_onehot)
+        self.memory_rewards.append(reward)
 
     def batch_train(self):
         q_values = self.model.predict(self.batch_states)
@@ -108,16 +122,43 @@ class Agent:
         )
         self.reset_batch()
 
-    def trim_memory(self, length=MAX_MEMORY):
-        for i in range(len(self.batch_states)):
-            self.batch_states[i] = self.batch_states[i][-length:]
-        self.batch_rewards = self.batch_rewards[-length:]
-        self.batch_actions = self.batch_actions[-length:]
+    def trim_memory(self, length=None):
+        if not length:
+            length = self.max_memory
+        for i in range(len(self.memory_states)):
+            self.memory_states[i] = self.memory_states[i][-length:]
+        self.memory_rewards = self.memory_rewards[-length:]
+        self.memory_actions = self.memory_actions[-length:]
+
+    def prepare_batch(self, size: int, mode: str = "last"):
+        if mode == "sample":
+            if len(self.memory_rewards) == self.max_memory:
+                indices = np.random.choice(np.arange(self.max_memory), size, p=self.memory_sampling_dist)
+                for i in indices:
+                    for s in range(len(self.batch_states)):
+                        self.batch_states[s].append(self.memory_states[s][i])
+                    self.batch_actions.append(self.memory_actions[i])
+                    self.batch_rewards.append(self.memory_rewards[i])
+                else:
+                    for s in range(len(self.batch_states)):
+                        self.batch_states[s] = self.memory_states[s][-size:]
+                    self.batch_actions = self.memory_actions[-size:]
+                    self.batch_rewards = self.memory_rewards[-size:]
+        elif mode == "last":
+            for s in range(len(self.batch_states)):
+                self.batch_states[s] = self.memory_states[s][-size:]
+            self.batch_actions = self.memory_actions[-size:]
+            self.batch_rewards = self.memory_rewards[-size:]
 
     def reset_batch(self):
         self.batch_states = [[] for _ in self.input_shapes]
         self.batch_actions = []
         self.batch_rewards = []
+
+    def reset_memory(self):
+        self.memory_states = [[] for _ in self.input_shapes]
+        self.memory_actions = []
+        self.memory_rewards = []
 
     def load(self, name):
         self.model.load_weights(name)
@@ -368,6 +409,7 @@ class MultiAgent(Agent):
         self.net["sender"].input_shapes = input_shapes[:-1]
         self.net["sender"].output_size = n_symbols
         self.net["sender"].reset_batch()
+        self.net["sender"].reset_memory()
 
         # Receiver part
         symbol_shape = input_shapes[-1]
@@ -377,7 +419,7 @@ class MultiAgent(Agent):
                                    name=f"embed_sym")
         symbol = layers.Flatten()(emb_sym(sym_input))
 
-        mode = "dense"
+        # mode = "dot"
         if mode == "dot":
             # sig = layers.Activation("sigmoid")
             dot = layers.Dot(axes=1)
@@ -404,6 +446,7 @@ class MultiAgent(Agent):
         self.net["receiver"].input_shapes = input_shapes
         self.net["receiver"].output_size = n_input_images
         self.net["receiver"].reset_batch()
+        self.net["receiver"].reset_memory()
 
     def set_role(self, role="sender"):
         assert role in ("sender", "receiver")
@@ -435,17 +478,6 @@ class MultiAgent(Agent):
                 action = np.random.choice(range(len(act_probs)), 1)
             else:
                 action = np.argmax(act_probs)
-        elif explore == "nmax":
-            nmax = 3
-            mask = np.argpartition(act_probs, -nmax)[:-nmax]
-            # TODO: sample from top N symbols
-            act_probs_exp = np.exp(act_probs / gibbs_temperature)
-            # Random idea:
-            # max_prob = act_probs.max()
-            # act_probs_exp = np.exp(act_probs / max_prob)
-            act_probs_exp = act_probs_exp / act_probs_exp.sum()
-            # print(self.name, self.active_net().model.name, act_probs_exp.min(), act_probs_exp.max())
-            action = np.random.choice(range(len(act_probs_exp)), 1, p=act_probs_exp)
         else:
             action = np.argmax(act_probs)
         self.last_action = (state, action, act_probs)
@@ -462,6 +494,13 @@ class MultiAgent(Agent):
 
     def remember(self, state, action, reward):
         self.active_net().remember(state, action, reward)
+
+    def make_distribution(self, mode: str = ""):
+        for net in self.net.values():
+            net.make_distribution(mode)
+
+    def prepare_batch(self, size: int, batch_mode: str = "last"):
+        self.active_net().prepare_batch(size, batch_mode)
 
     def batch_train(self):
         self.last_loss = self.active_net().batch_train()

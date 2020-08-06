@@ -3,7 +3,7 @@ from utils.set_seed import set_seed
 set_seed(1)
 
 import os
-import json5
+import yaml
 import sys
 from datetime import datetime
 
@@ -14,7 +14,8 @@ from game.game import Game
 from agent import q_agent
 from utils.dataprep import load_emb_gz, make_categories
 
-SETTINGS_FILE = "settings.json5"
+# SETTINGS_FILE = "settings.json5"
+SETTINGS_FILE = "settings.yaml"
 
 
 def run_training(model_dir, load_file, save_file, dataset, trim_dataset_to_n_images, use_categories,
@@ -44,7 +45,7 @@ def run_training(model_dir, load_file, save_file, dataset, trim_dataset_to_n_ima
     }
 
     for k in ("sender_type", "n_informed_filters", "embedding_size", "learning_rate", "gibbs_temperature",
-              "loss", "optimizer", "use_bias", "explore"):
+              "loss", "optimizer", "use_bias", "explore", "batch_mode"):
         if k in experiment_args:
             agent_args[k] = experiment_args[k]
 
@@ -119,7 +120,7 @@ def run_test(model_dir, load_file, save_file, dataset, trim_dataset_to_n_images,
     res_file = f"{save_filename}.res.csv"
     with open(res_file, "w") as rf:
         training.run_test(game, agent1, agent2, rf, n_active_images=n_active_images,
-                              **experiment_args)
+                          **experiment_args)
 
 
 def main(experiment_args):
@@ -135,10 +136,10 @@ def main(experiment_args):
         experiment_args["mode"] = "test"
         experiment_args["load_file"] = experiment_args["save_file"]
         filename = experiment_args["save_file"]
-        param_filename = os.path.join(experiment_args["model_dir"], f"{filename}.json5")
+        param_filename = os.path.join(experiment_args["model_dir"], f"{filename}.yaml")
         print(f"Writing parameters to '{param_filename}' ...")
         with open(param_filename, "w") as f:
-            json5.dump(experiment_args, f, indent="    ")
+            yaml.safe_dump(experiment_args, f, indent=4)
     else:
         raise ValueError(f"Invalid mode: '{mode}'")
 
@@ -149,5 +150,5 @@ if __name__ == "__main__":
     else:
         settings_file = SETTINGS_FILE
     with open(settings_file, "r") as f:
-        experiment_args = json5.load(f)
+        experiment_args = yaml.safe_load(f)
     main(experiment_args)
