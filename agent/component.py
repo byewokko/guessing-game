@@ -51,15 +51,14 @@ class Net:
         self.memory_rewards = self.memory_rewards[-length:]
         self.memory_actions = self.memory_actions[-length:]
 
-    def make_distribution(self, size: int, mode: str = ""):
-
+    def make_distribution(self, size: int, mode: str = None):
         if not mode or mode == "uniform":
             self.memory_sampling_dist = np.ones(size) / size
         elif mode == "linear":
-            d = np.linspace(0, 1, size)
+            d = np.linspace(0, 1, size+1)[1:]
             self.memory_sampling_dist = d / d.sum()
         elif mode == "quadratic":
-            d = np.linspace(0, 1, size)
+            d = np.linspace(0, 1, size+1)[1:]
             d = d * d
             self.memory_sampling_dist = d / d.sum()
         else:

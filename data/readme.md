@@ -1,10 +1,24 @@
-# ImageNet dataset
+## ImageNet dataset
+
+`imagenet-200x65-vgg19.train.emb.gz`
+
+**Training set**: 200 randomly sampled ImageNet categories, each with 65 images, Embedded using vgg19.
+
+`imagenet-200x15-vgg19.test-img.emb.gz`
+
+**Validation set**: The same 200 categories, each with 15 new images.
+
+`imagenet-27x80-vgg19.test-ctg.emb.gz`
+
+**Validation set**: 27 new categories, each with 80 new images.
+
+## Small ImageNet dataset
 
 ```imagenet-4000-vgg19.emb.gz```
 
 4200 randomly sampled images from 42 randomly sampled imagenet categories, embedded using pretrained vgg19.
 
-# ESP dataset
+## ESP dataset
 
 ```esp-10000-vgg19.emb.gz```
 

@@ -11,13 +11,13 @@ load_file: null
 save_file: "{TIMESTAMP}-basic"
 
 # Roles mode: switch or fixed
-#roles: switch
-roles: fixed
+roles: switch
+#roles: fixed
 
 # Number of episodes to play in total
 n_episodes: 20000
 
-# Number of episodes between updates
+# Training batch size, also the number of episodes between updates
 batch_size: 30
 
 # Path to embedding file
@@ -44,16 +44,16 @@ embedding_size: 50
 n_active_images: 2
 
 # Exploration strategy: False gibbs or decay
-#explore: gibbs
-explore: False
+explore: gibbs
+#explore: False
 #explore: decay
 
 # Gibbs temperature value
-gibbs_temperature: 1
+gibbs_temperature: 0.1
 
 # Sender type: agnostic or informed
-sender_type: agnostic
-#sender_type: informed
+#sender_type: agnostic
+sender_type: informed
 
 # Number of CNN filters used by the informed sender
 n_informed_filters: 20
