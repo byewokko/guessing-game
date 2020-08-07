@@ -11,11 +11,11 @@ load_file: null
 save_file: "{TIMESTAMP}-basic"
 
 # Roles mode: switch or fixed
-roles: switch
-#roles: fixed
+#roles: switch
+roles: fixed
 
 # Number of episodes to play in total
-n_episodes: 20000
+n_episodes: 30000
 
 # Training batch size, also the number of episodes between updates
 batch_size: 30
@@ -35,21 +35,21 @@ trim_dataset_to_n_images: null
 use_categories: True
 
 # Number of symbols that the agents use to communicate
-vocabulary_size: 50
+vocabulary_size: 10
 
 # Size of the first layer in the agents' networks
 embedding_size: 50
 
 # Number of images presented in each turn of the game
-n_active_images: 2
+n_active_images: 4
 
 # Exploration strategy: False gibbs or decay
-explore: gibbs
-#explore: False
+#explore: gibbs
+explore: False
 #explore: decay
 
 # Gibbs temperature value
-gibbs_temperature: 0.1
+gibbs_temperature: 1
 
 # Sender type: agnostic or informed
 #sender_type: agnostic

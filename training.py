@@ -107,7 +107,7 @@ def run_test(game, agent1, agent2, res_file, n_episodes, batch_size, n_active_im
              roles="switch", show_plot=False, explore=None, gibbs_temperature=0.01, **kwargs):
     # Set up the logging of results
     columns = "sender_name,receiver_name,active_images,target_image,chosen_symbol,chosen_symbol_p,\
-    chosen_image,chosen_image_p,success".replace(" ", "").split(",")
+    chosen_image,chosen_image_p,chosen_image_index,success".replace(" ", "").split(",")
     results = {k: None for k in columns}
     df_results = pd.DataFrame(columns=columns)
     # df_results.set_index("episode", inplace=True)
@@ -152,6 +152,7 @@ def run_test(game, agent1, agent2, res_file, n_episodes, batch_size, n_active_im
                                                               gibbs_temperature=gibbs_temperature)
         results["chosen_image"] = img_ids[receiver_action]
         results["chosen_image_p"] = receiver_action_probs[receiver_action]
+        results["chosen_image_index"] = receiver_action
         sender_reward, receiver_reward, success = game.evaluate_guess(receiver_action)
 
         results["success"] = int(success)

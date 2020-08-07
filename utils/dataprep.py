@@ -98,9 +98,3 @@ def split_dataset(data_length, ratio):
     for n in ratio:
         splits.append(splits[-1] + n)
     out = [ind[ratio[i]:ratio[i + 1]] for i in range(len(ratio))]
-
-
-def reduce_emb(x, n_comp):
-    from sklearn.decomposition import PCA
-    pca = PCA(n_comp)
-    return pca.fit_transform(x)

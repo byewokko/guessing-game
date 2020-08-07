@@ -30,13 +30,12 @@ with open(data_file) as fin:
     img_buff = []
     ctgs = []
     for line in fin:
-        line = line.replace("\\ ", "_")
         ctg = line.split("\\")[-2]
         if not ctgs:
             ctgs.append(ctg)
-        elif ctgs[-1] != ctg:
+        if ctgs[-1] != ctg:
             print(ctg)
-            if len(ctgs) < test_ctgs:
+            if len(ctgs) <= test_ctgs:
                 test_ctg_count += len(img_buff)
                 test_ctg_out.writelines(img_buff)
             else:
@@ -47,6 +46,11 @@ with open(data_file) as fin:
             ctgs.append(ctg)
             img_buff.clear()
         img_buff.append(line.encode("ascii"))
+    # Write the last category
+    test_img_count += len(img_buff[:test_imgs])
+    train_count += len(img_buff[test_imgs:])
+    test_img_out.writelines(img_buff[:test_imgs])
+    train_out.writelines(img_buff[test_imgs:])
     train_out.close()
     test_ctg_out.close()
     test_img_out.close()
