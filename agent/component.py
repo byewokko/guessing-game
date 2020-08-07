@@ -51,33 +51,34 @@ class Net:
         self.memory_rewards = self.memory_rewards[-length:]
         self.memory_actions = self.memory_actions[-length:]
 
-    def make_distribution(self, mode: str = ""):
-        d = np.linspace(0, 1, self.max_memory)
-        if not mode or mode == "linear":
+    def make_distribution(self, size: int, mode: str = ""):
+
+        if not mode or mode == "uniform":
+            self.memory_sampling_dist = np.ones(size) / size
+        elif mode == "linear":
+            d = np.linspace(0, 1, size)
             self.memory_sampling_dist = d / d.sum()
         elif mode == "quadratic":
+            d = np.linspace(0, 1, size)
             d = d * d
             self.memory_sampling_dist = d / d.sum()
         else:
             raise ValueError(f"Invalid mode: '{mode}'")
 
-    def prepare_batch(self, size: int, batch_mode: str = "last"):
+    def prepare_batch(self, size: int, batch_mode: str = "last", memory_sampling_distribution: str = "uniform"):
         self.reset_batch()
         self.trim_memory()
-        assert self.memory_sampling_dist is not None
         if batch_mode == "sample":
-            if len(self.memory_rewards) == self.max_memory:
-                indices = np.random.choice(np.arange(self.max_memory), size, p=self.memory_sampling_dist)
-                for i in indices:
-                    for s in range(len(self.batch_states)):
-                        self.batch_states[s].append(self.memory_states[s][i])
-                    self.batch_actions.append(self.memory_actions[i])
-                    self.batch_rewards.append(self.memory_rewards[i])
-            else:
+            if self.memory_sampling_dist is None \
+                    or len(self.memory_rewards) != len(self.memory_sampling_dist):
+                self.make_distribution(len(self.memory_rewards), memory_sampling_distribution)
+            indices = np.random.choice(np.arange(len(self.memory_rewards)), size,
+                                       replace=False, p=self.memory_sampling_dist)
+            for i in indices:
                 for s in range(len(self.batch_states)):
-                    self.batch_states[s] = self.memory_states[s][-size:]
-                self.batch_actions = self.memory_actions[-size:]
-                self.batch_rewards = self.memory_rewards[-size:]
+                    self.batch_states[s].append(self.memory_states[s][i])
+                self.batch_actions.append(self.memory_actions[i])
+                self.batch_rewards.append(self.memory_rewards[i])
         elif batch_mode == "last":
             for s in range(len(self.batch_states)):
                 self.batch_states[s] = self.memory_states[s][-size:]

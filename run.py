@@ -14,7 +14,6 @@ from game.game import Game
 from agent import q_agent
 from utils.dataprep import load_emb_gz, make_categories
 
-# SETTINGS_FILE = "settings.json5"
 SETTINGS_FILE = "settings.yaml"
 
 
@@ -45,7 +44,7 @@ def run_training(model_dir, load_file, save_file, dataset, trim_dataset_to_n_ima
     }
 
     for k in ("sender_type", "n_informed_filters", "embedding_size", "learning_rate", "gibbs_temperature",
-              "loss", "optimizer", "use_bias", "explore", "batch_mode"):
+              "loss", "optimizer", "use_bias", "explore", "batch_mode", "memory_sampling_distribution"):
         if k in experiment_args:
             agent_args[k] = experiment_args[k]
 
@@ -61,8 +60,11 @@ def run_training(model_dir, load_file, save_file, dataset, trim_dataset_to_n_ima
 
     game = Game(**game_args)
 
-    training.run_training(game, agent1, agent2, n_images_to_guess_from=n_active_images,
-                          **experiment_args)
+    try:
+        training.run_training(game, agent1, agent2, n_images_to_guess_from=n_active_images,
+                              **experiment_args)
+    except KeyboardInterrupt:
+        filename = f"interrupted-{filename}"
 
     if save_file:
         print(f"Saving weights to '{filename}.*' ...")

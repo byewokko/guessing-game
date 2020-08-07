@@ -495,12 +495,8 @@ class MultiAgent(Agent):
     def remember(self, state, action, reward):
         self.active_net().remember(state, action, reward)
 
-    def make_distribution(self, mode: str = ""):
-        for net in self.net.values():
-            net.make_distribution(mode)
-
-    def prepare_batch(self, size: int, batch_mode: str = "last"):
-        self.active_net().prepare_batch(size, batch_mode)
+    def prepare_batch(self, size: int, **kwargs):
+        self.active_net().prepare_batch(size, **kwargs)
 
     def batch_train(self):
         self.last_loss = self.active_net().batch_train()

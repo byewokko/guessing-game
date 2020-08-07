@@ -11,7 +11,7 @@ load_file: null
 save_file: "{TIMESTAMP}-basic"
 
 # Roles mode: switch or fixed
-# roles: switch
+#roles: switch
 roles: fixed
 
 # Number of episodes to play in total
@@ -21,12 +21,12 @@ n_episodes: 20000
 batch_size: 30
 
 # Path to embedding file
-# dataset: data/imagenet-4000-vgg19.emb.gz
+#dataset: data/imagenet-4000-vgg19.emb.gz
 dataset: data/imagenet-200x65-vgg19.train.emb.gz
-# dataset: data/imagenet-200x15-vgg19.test-img.emb.gz
-# dataset: data/imagenet-27x80-vgg19.test-ctg.emb.gz
-# dataset: data/esp-10000-vgg19.emb.gz
-# dataset: data/esp-10000-xception.emb.gz
+#dataset: data/imagenet-200x15-vgg19.test-img.emb.gz
+#dataset: data/imagenet-27x80-vgg19.test-ctg.emb.gz
+#dataset: data/esp-10000-vgg19.emb.gz
+#dataset: data/esp-10000-xception.emb.gz
 
 # Number of images to play with (-null- to keep the whole dataset)
 trim_dataset_to_n_images: null
@@ -44,26 +44,32 @@ embedding_size: 50
 n_active_images: 2
 
 # Exploration strategy: False gibbs or decay
-# explore: gibbs
+#explore: gibbs
 explore: False
-# explore: decay
+#explore: decay
 
 # Gibbs temperature value
 gibbs_temperature: 1
 
 # Sender type: agnostic or informed
-#sender_type: agnostic
-sender_type: informed
+sender_type: agnostic
+#sender_type: informed
 
 # Number of CNN filters used by the informed sender
 n_informed_filters: 20
 
 # Agent loss function
 loss: binary_crossentropy
-# loss: mse
+#loss: mse
 
 # learning_rate: 0.001
 
+# Batch preparation mode
+# - last: only the newest memory entries are selected into the batch
+# - sample: the whole memory is sampled, using the probability distribution below
 batch_mode: sample
 
+# Probability distributions for batch sampling
+# - uniform: all memory entries are given the same probability
+# - linear, quadratic: probability distribution is skewed in favor of the newer memory entries
 memory_sampling_distribution: linear
