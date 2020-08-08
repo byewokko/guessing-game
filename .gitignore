@@ -1,6 +1,6 @@
 .*/
 data/big/
-models/
+local_only/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

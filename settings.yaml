@@ -8,14 +8,14 @@ model_dir: models
 load_file: null
 
 # Prefix used for saving weights result and log files
-save_file: "{TIMESTAMP}-basic"
+save_file: "{TIMESTAMP}-switch4"
 
 # Roles mode: switch or fixed
-#roles: switch
-roles: fixed
+roles: switch
+#roles: fixed
 
 # Number of episodes to play in total
-n_episodes: 30000
+n_episodes: 45000
 
 # Training batch size, also the number of episodes between updates
 batch_size: 30
