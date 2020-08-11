@@ -8,11 +8,11 @@ model_dir: models
 load_file: null
 
 # Prefix used for saving weights result and log files
-save_file: "{TIMESTAMP}-dropout"
+save_file: "{TIMESTAMP}-sharedexp"
 
 # Roles mode: switch or fixed
-#roles: switch
-roles: fixed
+roles: switch
+#roles: fixed
 
 # Number of episodes to play in total
 n_episodes: 45000
@@ -44,12 +44,12 @@ embedding_size: 50
 n_active_images: 2
 
 # Exploration strategy: False gibbs or decay
-#explore: gibbs
-explore: False
+explore: gibbs
+#explore: False
 #explore: decay
 
 # Gibbs temperature value
-gibbs_temperature: 1
+gibbs_temperature: 0.1
 
 # Sender type: agnostic or informed
 #sender_type: agnostic
@@ -60,9 +60,10 @@ n_informed_filters: 20
 
 # Agent loss function
 loss: binary_crossentropy
+#loss: categorical_crossentropy
 #loss: mse
 
-# learning_rate: 0.001
+#learning_rate: 0.05
 
 # Batch preparation mode
 # - last: only the newest memory entries are selected into the batch
@@ -74,4 +75,9 @@ batch_mode: sample
 # - linear, quadratic: probability distribution is skewed in favor of the newer memory entries
 memory_sampling_distribution: linear
 
-dropout: 0.3
+# Dropout applied after first layer
+# (doesn't make difference)
+dropout: 0
+
+# Sharing experience with both parts of each agent
+shared_experience: True

@@ -15,8 +15,8 @@ OPTIMIZER = optim.Adam
 LOSS = "mse"
 CNN_FILTERS = 20
 EXPLORATION_RATE = 1.
-EXPLORATION_DECAY = .995
-EXPLORATION_FLOOR = .015
+EXPLORATION_DECAY = .99995
+EXPLORATION_FLOOR = .02
 MAX_MEMORY = 2000
 
 
@@ -81,7 +81,7 @@ class MultiAgent(Agent):
         if explore == "gibbs":
             action = np.random.choice(range(len(act_probs)), 1, p=act_probs)
         elif explore == "decay":
-            if np.random.rand() > self.exploration_rate:
+            if np.random.rand() < self.exploration_rate:
                 if self.exploration_rate > self.exploration_min:
                     self.exploration_rate *= self.exploration_rate_decay
                 action = np.random.choice(range(len(act_probs)), 1)
@@ -89,7 +89,7 @@ class MultiAgent(Agent):
                 action = np.argmax(act_probs)
         else:
             action = np.argmax(act_probs)
-        self.last_action = (state, action, act_probs)
+        # self.last_action = (state, action, act_probs)
         return action, act_probs
 
     def fit(self, state, action, reward):
@@ -99,8 +99,11 @@ class MultiAgent(Agent):
         Y = np.expand_dims(action_onehot, 0)
         self.last_loss = self.active_net().train_on_batch([*X, reward], Y)
 
-    def remember(self, state, action, reward):
-        self.active_net().remember(state, action, reward)
+    def remember(self, state, action, reward, net=None):
+        if not net:
+            self.active_net().remember(state, action, reward)
+        else:
+            self.net[net].remember(state, action, reward)
 
     def prepare_batch(self, size: int, **kwargs):
         self.active_net().prepare_batch(size, **kwargs)
@@ -206,7 +209,7 @@ class MultiAgent(Agent):
         symbol = layers.Flatten()(emb_sym(sym_input))
         symbol = layers.Dropout(dropout)(symbol)
 
-        # mode = "dot"
+        # mode = "dense"
         if mode == "dot":
             dot = layers.Dot(axes=1)
             dot_prods = [dot([img, symbol]) for img in imgs]
@@ -214,7 +217,7 @@ class MultiAgent(Agent):
         elif mode == "dense":
             out = layers.concatenate([*imgs, symbol], axis=-1)
             out = layers.Dense(n_input_images,
-                               activation="sigmoid",
+                               # activation="sigmoid",
                                name=f"dense_join")(out)
         else:
             raise ValueError(f"'{mode}' is not a valid mode.")

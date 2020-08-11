@@ -7,15 +7,16 @@ from utils.plot import plot_colourline
 
 def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_images_to_guess_from,
                  roles="switch", show_plot=True, explore="gibbs", gibbs_temperature=0.01,
-                 memory_sampling_distribution="linear", **kwargs):
+                 memory_sampling_distribution="linear", shared_experience=False, **kwargs):
     # agent1.make_distribution(memory_sampling_distribution)
     # agent2.make_distribution(memory_sampling_distribution)
     if show_plot:
-        fig = plt.figure()
+        fig = plt.figure(figsize=(8, 8))
         plt.subplots_adjust(hspace=0.65)
-        ax1 = fig.add_subplot(311)
-        ax2 = fig.add_subplot(312)
-        ax3 = fig.add_subplot(313)
+        ax1 = fig.add_subplot(411)
+        ax2 = fig.add_subplot(412)
+        ax3 = fig.add_subplot(413)
+        ax4 = fig.add_subplot(414)
         plt.ion()
         fig.show()
         fig.canvas.draw()
@@ -31,18 +32,24 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
     recvr2_loss = []
     success_rate_avg = []
     success_rate_variance = []
+    sender_symbols = []
     sender = agent1
     receiver = agent2
     for episode in range(1, n_episodes + 1):
         game.reset()
         sender_state = game.get_sender_state(n_images=n_images_to_guess_from, unique_categories=True)
         sender_action, _ = sender.act(sender_state, explore=explore, gibbs_temperature=gibbs_temperature)
+        sender_symbols.append(int(sender_action))
         receiver_state = game.get_receiver_state(sender_action)
         receiver_action, _ = receiver.act(receiver_state, explore=explore, gibbs_temperature=gibbs_temperature)
         sender_reward, receiver_reward, success = game.evaluate_guess(receiver_action)
 
         sender.remember(sender_state, sender_action, sender_reward)
         receiver.remember(receiver_state, receiver_action, receiver_reward)
+
+        if shared_experience:
+            sender.remember(receiver_state, receiver_action, receiver_reward, net="receiver")
+            receiver.remember(sender_state, sender_action, sender_reward, net="sender")
 
         batch_success.append(success)
 
@@ -55,6 +62,8 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
             receiver.prepare_batch(batch_size, batch_mode=batch_mode,
                                    memory_sampling_distribution=memory_sampling_distribution)
             receiver.batch_train()
+
+            sender_symbols = sender_symbols[-show_steps:]
 
             if roles == "switch":
                 sender.switch_role()
@@ -85,9 +94,11 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
             ax1.clear()
             ax2.clear()
             ax3.clear()
+            ax4.clear()
             ax1.set_title("Sender loss")
             ax2.set_title("Receiver loss")
-            ax3.set_title("Average batch success rate")
+            ax3.set_title("Batch success rate")
+            ax4.set_title("Sender symbols histogram")
             ax1.plot(t[-show_steps:], sendr1_loss[-show_steps:], "m", label="Agent 1")
             ax1.plot(t[-show_steps:], sendr2_loss[-show_steps:], "c", label="Agent 2")
             ax1.legend(loc="lower left")
@@ -96,6 +107,8 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
             ax2.legend(loc="lower left")
             ax3.plot(t[-show_steps:], success_rate[-show_steps:], "r.")
             plot_colourline(t[-show_steps:], success_rate_avg[-show_steps:], success_rate_variance[-show_steps:], ax3)
+            ax4.hist(sender_symbols)
+            # print(sender_symbols[-show_steps:])
             fig.canvas.draw()
             fig.canvas.flush_events()
 
