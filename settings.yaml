@@ -8,11 +8,11 @@ model_dir: models
 load_file: null
 
 # Prefix used for saving weights result and log files
-save_file: "{TIMESTAMP}-switch4"
+save_file: "{TIMESTAMP}-dropout"
 
 # Roles mode: switch or fixed
-roles: switch
-#roles: fixed
+#roles: switch
+roles: fixed
 
 # Number of episodes to play in total
 n_episodes: 45000
@@ -41,7 +41,7 @@ vocabulary_size: 10
 embedding_size: 50
 
 # Number of images presented in each turn of the game
-n_active_images: 4
+n_active_images: 2
 
 # Exploration strategy: False gibbs or decay
 #explore: gibbs
@@ -73,3 +73,5 @@ batch_mode: sample
 # - uniform: all memory entries are given the same probability
 # - linear, quadratic: probability distribution is skewed in favor of the newer memory entries
 memory_sampling_distribution: linear
+
+dropout: 0.3

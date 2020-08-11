@@ -33,7 +33,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
     success_rate_variance = []
     sender = agent1
     receiver = agent2
-    for i in range(1, n_episodes + 1):
+    for episode in range(1, n_episodes + 1):
         game.reset()
         sender_state = game.get_sender_state(n_images=n_images_to_guess_from, unique_categories=True)
         sender_action, _ = sender.act(sender_state, explore=explore, gibbs_temperature=gibbs_temperature)
@@ -46,7 +46,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
 
         batch_success.append(success)
 
-        if not i % batch_size:
+        if not episode % batch_size:
             avg_success = sum(batch_success) / len(batch_success)
             batch_success = []
             sender.prepare_batch(batch_size, batch_mode=batch_mode,
@@ -64,7 +64,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
                 receiver = tmp
 
             # PLOT PROGRESS
-            t.append(i)
+            t.append(episode)
             success_rate.append(avg_success)
             if len(success_rate) < window:
                 success_rate_avg.append(np.nan)
@@ -77,8 +77,8 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
             sendr2_loss.append(agent2.net["sender"].last_loss)
             recvr1_loss.append(agent1.net["receiver"].last_loss)
             recvr2_loss.append(agent2.net["receiver"].last_loss)
-            if not i % 50:
-                print(f"Episode {i}")
+            if not episode % 50:
+                print(f"Episode {episode}")
                 print(f"Batch success rate {success_rate_avg[-1]}")
             if not show_plot:
                 continue
@@ -134,7 +134,8 @@ def run_test(game, agent1, agent2, res_file, n_episodes, batch_size, n_active_im
     success_rate_avg = []
     sender = agent1
     receiver = agent2
-    for i in range(1, n_episodes + 1):
+
+    for episode in range(1, n_episodes+1):
         # results["episode"] = i
         results["sender_name"] = sender.get_active_name()
         results["receiver_name"] = receiver.get_active_name()
@@ -159,7 +160,7 @@ def run_test(game, agent1, agent2, res_file, n_episodes, batch_size, n_active_im
         batch_success.append(success)
         df_results = df_results.append(results, ignore_index=True)
 
-        if not i % batch_size:
+        if not episode % batch_size:
             if roles == "switch":
                 sender.switch_role()
                 receiver.switch_role()
@@ -167,9 +168,9 @@ def run_test(game, agent1, agent2, res_file, n_episodes, batch_size, n_active_im
                 sender = receiver
                 receiver = tmp
 
-        if not i % 200:
+        if not episode % 200:
             avg_success = df_results[-200:]["success"].sum() / 200
-            print(f"Episode {i}, average success: {avg_success}")
+            print(f"Episode {episode}, average success: {avg_success}")
 
     df_results.to_csv(res_file, line_terminator="\n")
     print("Test finished")

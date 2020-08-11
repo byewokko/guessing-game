@@ -44,7 +44,7 @@ def run_training(model_dir, load_file, save_file, dataset, trim_dataset_to_n_ima
     }
 
     for k in ("sender_type", "n_informed_filters", "embedding_size", "learning_rate", "gibbs_temperature",
-              "loss", "optimizer", "use_bias", "explore", "batch_mode", "memory_sampling_distribution"):
+              "loss", "optimizer", "use_bias", "explore", "batch_mode", "memory_sampling_distribution", "dropout"):
         if k in experiment_args:
             agent_args[k] = experiment_args[k]
 
@@ -63,13 +63,13 @@ def run_training(model_dir, load_file, save_file, dataset, trim_dataset_to_n_ima
     try:
         training.run_training(game, agent1, agent2, n_images_to_guess_from=n_active_images,
                               **experiment_args)
-    except KeyboardInterrupt:
-        filename = f"interrupted-{filename}"
-
-    if save_file:
-        print(f"Saving weights to '{filename}.*' ...")
-        agent1.save(f"{filename}.01")
-        agent2.save(f"{filename}.02")
+    except (InterruptedError, KeyboardInterrupt):
+        filename = f"{filename}-interrupted"
+    finally:
+        if save_file:
+            print(f"Saving weights to '{filename}.*' ...")
+            agent1.save(f"{filename}.01")
+            agent2.save(f"{filename}.02")
 
 
 def run_test(model_dir, load_file, save_file, dataset, trim_dataset_to_n_images, use_categories,

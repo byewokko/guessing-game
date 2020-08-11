@@ -130,7 +130,7 @@ class MultiAgent(Agent):
 
     def _build_model(self, input_shapes, n_symbols, embedding_size=EMBEDDING_SIZE, n_informed_filters=20,
                      use_bias=USE_BIAS, loss=LOSS, optimizer=OPTIMIZER, learning_rate=LEARNING_RATE,
-                     mode="dot", sender_type="agnostic", **kwargs):
+                     mode="dot", sender_type="agnostic", dropout=0, **kwargs):
         # Shared part
         n_input_images = len(input_shapes) - 1
         inputs = [layers.Input(shape=input_shapes[i],
@@ -148,6 +148,8 @@ class MultiAgent(Agent):
 
         # imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
         imgs = [emb(inputs[i]) for i in range(n_input_images)]  # same embedding layer for all images
+
+        imgs = [layers.Dropout(dropout)(imgs[i]) for i in range(n_input_images)]
 
         if isinstance(optimizer, str):
             if optimizer.lower() == "adam":
@@ -202,6 +204,7 @@ class MultiAgent(Agent):
                                    output_dim=embedding_size,
                                    name=f"embed_sym")
         symbol = layers.Flatten()(emb_sym(sym_input))
+        symbol = layers.Dropout(dropout)(symbol)
 
         # mode = "dot"
         if mode == "dot":
