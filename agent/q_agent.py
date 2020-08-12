@@ -133,7 +133,8 @@ class MultiAgent(Agent):
 
     def _build_model(self, input_shapes, n_symbols, embedding_size=EMBEDDING_SIZE, n_informed_filters=20,
                      use_bias=USE_BIAS, loss=LOSS, optimizer=OPTIMIZER, learning_rate=LEARNING_RATE,
-                     mode="dot", sender_type="agnostic", dropout=0, **kwargs):
+                     mode="dot", sender_type="agnostic", dropout=0, shared_embedding=True,
+                     out_activation="softmax", **kwargs):
         # Shared part
         n_input_images = len(input_shapes) - 1
         inputs = [layers.Input(shape=input_shapes[i],
@@ -152,7 +153,8 @@ class MultiAgent(Agent):
         # imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
         imgs = [emb(inputs[i]) for i in range(n_input_images)]  # same embedding layer for all images
 
-        imgs = [layers.Dropout(dropout)(imgs[i]) for i in range(n_input_images)]
+        if dropout:
+            imgs = [layers.Dropout(dropout)(imgs[i]) for i in range(n_input_images)]
 
         if isinstance(optimizer, str):
             if optimizer.lower() == "adam":
@@ -188,10 +190,10 @@ class MultiAgent(Agent):
             raise KeyError(f"Unknown sender type: {sender_type}")
 
         # Common sender part
-        if self.gibbs_temperature != 1:
+        if self.gibbs_temperature != 0:
             out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
-        out = layers.Activation("softmax")(out)
-        # out = layers.Activation("sigmoid")(out)
+        # out = layers.Activation("softmax")(out)
+        out = layers.Activation(out_activation)(out)
 
         self.net["sender"].model = Model(inputs, out)
         self.net["sender"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate))
@@ -209,11 +211,15 @@ class MultiAgent(Agent):
         symbol = layers.Flatten()(emb_sym(sym_input))
         symbol = layers.Dropout(dropout)(symbol)
 
+        if not shared_embedding:
+            imgs = [emb(inputs[i]) for i in range(n_input_images)]
+
         # mode = "dense"
         if mode == "dot":
             dot = layers.Dot(axes=1)
             dot_prods = [dot([img, symbol]) for img in imgs]
             out = layers.concatenate(dot_prods, axis=-1)
+            # out = layers.Dense(n_input_images)(out)
         elif mode == "dense":
             out = layers.concatenate([*imgs, symbol], axis=-1)
             out = layers.Dense(n_input_images,
@@ -222,10 +228,10 @@ class MultiAgent(Agent):
         else:
             raise ValueError(f"'{mode}' is not a valid mode.")
 
-        if self.gibbs_temperature != 1:
+        if self.gibbs_temperature != 0:
             out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
-        out = layers.Activation("softmax")(out)
-        # out = layers.Activation("sigmoid")(out)
+        # out = layers.Activation("softmax")(out)
+        out = layers.Activation(out_activation)(out)
 
         self.net["receiver"].model = Model([*inputs, sym_input], out)
         self.net["receiver"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate))

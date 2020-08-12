@@ -82,13 +82,15 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
                 success_rate_avg.append(sum(success_rate[-window:]) / window)
                 success_rate_variance.append(
                     sum([(x - success_rate_avg[-1])**2 for x in success_rate[-window:]]) / window)
+                if success_rate_avg[-1] >= 0.9:
+                    print(f"{success_rate_avg[-1]} success reached in episode {episode}!")
             sendr1_loss.append(agent1.net["sender"].last_loss)
             sendr2_loss.append(agent2.net["sender"].last_loss)
             recvr1_loss.append(agent1.net["receiver"].last_loss)
             recvr2_loss.append(agent2.net["receiver"].last_loss)
             if not episode % 50:
                 print(f"Episode {episode}")
-                print(f"Batch success rate {success_rate_avg[-1]}")
+                print(f"Batch success rate {success_rate_avg[-1]}, std {success_rate_variance[-1]**(1/2)}")
             if not show_plot:
                 continue
             ax1.clear()

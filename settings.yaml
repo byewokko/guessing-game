@@ -11,8 +11,8 @@ load_file: null
 save_file: "{TIMESTAMP}-sharedexp"
 
 # Roles mode: switch or fixed
-roles: switch
-#roles: fixed
+#roles: switch
+roles: fixed
 
 # Number of episodes to play in total
 n_episodes: 45000
@@ -44,12 +44,12 @@ embedding_size: 50
 n_active_images: 2
 
 # Exploration strategy: False gibbs or decay
-explore: gibbs
-#explore: False
+#explore: gibbs
+explore: False
 #explore: decay
 
 # Gibbs temperature value
-gibbs_temperature: 0.1
+gibbs_temperature: 0
 
 # Sender type: agnostic or informed
 #sender_type: agnostic
@@ -63,11 +63,12 @@ loss: binary_crossentropy
 #loss: categorical_crossentropy
 #loss: mse
 
-#learning_rate: 0.05
+#learning_rate: 0.01
 
 # Batch preparation mode
 # - last: only the newest memory entries are selected into the batch
 # - sample: the whole memory is sampled, using the probability distribution below
+#batch_mode: last
 batch_mode: sample
 
 # Probability distributions for batch sampling
@@ -79,5 +80,10 @@ memory_sampling_distribution: linear
 # (doesn't make difference)
 dropout: 0
 
-# Sharing experience with both parts of each agent
-shared_experience: True
+# Sharing experience with both components of each agent
+shared_experience: False
+#shared_experience: True
+
+# Share the first, embedding layer between the sender and receiver component within each agent
+#shared_embedding: False
+shared_embedding: True

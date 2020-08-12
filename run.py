@@ -1,6 +1,6 @@
 from utils.set_seed import set_seed
 
-set_seed(1)
+set_seed(0)
 
 import os
 import yaml
@@ -44,7 +44,8 @@ def run_training(model_dir, load_file, save_file, dataset, trim_dataset_to_n_ima
     }
 
     for k in ("sender_type", "n_informed_filters", "embedding_size", "learning_rate", "gibbs_temperature",
-              "loss", "optimizer", "use_bias", "explore", "batch_mode", "memory_sampling_distribution", "dropout"):
+              "loss", "optimizer", "use_bias", "explore", "batch_mode", "memory_sampling_distribution", "dropout",
+              "shared_embedding", "out_activation"):
         if k in experiment_args:
             agent_args[k] = experiment_args[k]
 
