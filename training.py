@@ -1,13 +1,15 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import scipy.stats as stats
 
 from utils.plot import plot_colourline
 
 
 def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_images_to_guess_from,
                  roles="switch", show_plot=True, explore="gibbs", gibbs_temperature=0.01,
-                 memory_sampling_distribution="linear", shared_experience=False, **kwargs):
+                 memory_sampling_distribution="linear", shared_experience=False, stop_when_goal_is_passed=False,
+                 **kwargs):
     # agent1.make_distribution(memory_sampling_distribution)
     # agent2.make_distribution(memory_sampling_distribution)
     if show_plot:
@@ -22,7 +24,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
         fig.canvas.draw()
 
     t = []
-    show_steps = 200
+    analyse_batches = 200
     window = 20
     batch_success = []
     success_rate = []
@@ -35,10 +37,27 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
     sender_symbols = []
     sender = agent1
     receiver = agent2
+
+    # Goal: with 2 images (50% chance) reach 90% accuracy
+    # For other number of images compute equivalent accuracy level
+    err = 0.1
+    n = 1000
+    p = 0.5
+    q = stats.binom.cdf(err*n, n, p)
+    p = 1 / n_images_to_guess_from
+    n = analyse_batches * batch_size
+    err = stats.binom.ppf(q, n, 1 - p) / n
+    accuracy_goal = 1 - err
+    print(f"Goal: {accuracy_goal:.4f} success rate")
+    # How much is needed to be confident
+    alpha = 0.99
+    accuracy_goal_confident = stats.binom.ppf(alpha, n, accuracy_goal) / n
+
+    goal_reached = False
     for episode in range(1, n_episodes + 1):
         game.reset()
         sender_state = game.get_sender_state(n_images=n_images_to_guess_from, unique_categories=True)
-        sender_action, _ = sender.act(sender_state, explore=explore, gibbs_temperature=gibbs_temperature)
+        sender_action, sender_probs = sender.act(sender_state, explore=explore, gibbs_temperature=gibbs_temperature)
         sender_symbols.append(int(sender_action))
         receiver_state = game.get_receiver_state(sender_action)
         receiver_action, _ = receiver.act(receiver_state, explore=explore, gibbs_temperature=gibbs_temperature)
@@ -63,7 +82,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
                                    memory_sampling_distribution=memory_sampling_distribution)
             receiver.batch_train()
 
-            sender_symbols = sender_symbols[-show_steps:]
+            sender_symbols = sender_symbols[-analyse_batches:]
 
             if roles == "switch":
                 sender.switch_role()
@@ -82,8 +101,12 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
                 success_rate_avg.append(sum(success_rate[-window:]) / window)
                 success_rate_variance.append(
                     sum([(x - success_rate_avg[-1])**2 for x in success_rate[-window:]]) / window)
-                if success_rate_avg[-1] >= 0.9:
-                    print(f"{success_rate_avg[-1]} success reached in episode {episode}!")
+                if success_rate_avg[-1] >= accuracy_goal_confident and not goal_reached:
+                    goal_reached = True
+                    print(f"success rate > {accuracy_goal} reached in episode {episode} (p < 0.01)")
+                    if stop_when_goal_is_passed:
+                        print("Stopping")
+                        break
             sendr1_loss.append(agent1.net["sender"].last_loss)
             sendr2_loss.append(agent2.net["sender"].last_loss)
             recvr1_loss.append(agent1.net["receiver"].last_loss)
@@ -101,16 +124,16 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
             ax2.set_title("Receiver loss")
             ax3.set_title("Batch success rate")
             ax4.set_title("Sender symbols histogram")
-            ax1.plot(t[-show_steps:], sendr1_loss[-show_steps:], "m", label="Agent 1")
-            ax1.plot(t[-show_steps:], sendr2_loss[-show_steps:], "c", label="Agent 2")
+            ax1.plot(t[-analyse_batches:], sendr1_loss[-analyse_batches:], "m", label="Agent 1")
+            ax1.plot(t[-analyse_batches:], sendr2_loss[-analyse_batches:], "c", label="Agent 2")
             ax1.legend(loc="lower left")
-            ax2.plot(t[-show_steps:], recvr1_loss[-show_steps:], "m", label="Agent 1")
-            ax2.plot(t[-show_steps:], recvr2_loss[-show_steps:], "c", label="Agent 2")
+            ax2.plot(t[-analyse_batches:], recvr1_loss[-analyse_batches:], "m", label="Agent 1")
+            ax2.plot(t[-analyse_batches:], recvr2_loss[-analyse_batches:], "c", label="Agent 2")
             ax2.legend(loc="lower left")
-            ax3.plot(t[-show_steps:], success_rate[-show_steps:], "r.")
-            plot_colourline(t[-show_steps:], success_rate_avg[-show_steps:], success_rate_variance[-show_steps:], ax3)
+            ax3.plot(t[-analyse_batches:], success_rate[-analyse_batches:], "r.")
+            plot_colourline(t[-analyse_batches:], success_rate_avg[-analyse_batches:], success_rate_variance[-analyse_batches:], ax3)
             ax4.hist(sender_symbols)
-            # print(sender_symbols[-show_steps:])
+            # print(sender_symbols[-analyse_steps:])
             fig.canvas.draw()
             fig.canvas.flush_events()
 

@@ -15,7 +15,7 @@ save_file: "{TIMESTAMP}-sharedexp"
 roles: fixed
 
 # Number of episodes to play in total
-n_episodes: 45000
+n_episodes: 50000
 
 # Training batch size, also the number of episodes between updates
 batch_size: 30
@@ -41,15 +41,15 @@ vocabulary_size: 10
 embedding_size: 50
 
 # Number of images presented in each turn of the game
-n_active_images: 2
+n_active_images: 3
 
 # Exploration strategy: False gibbs or decay
-#explore: gibbs
-explore: False
+explore: gibbs
+#explore: False
 #explore: decay
 
 # Gibbs temperature value
-gibbs_temperature: 0
+gibbs_temperature: 0.1
 
 # Sender type: agnostic or informed
 #sender_type: agnostic
@@ -87,3 +87,10 @@ shared_experience: False
 # Share the first, embedding layer between the sender and receiver component within each agent
 #shared_embedding: False
 shared_embedding: True
+
+# Activation function applied to the network output
+#out_activation: sigmoid
+out_activation: softmax  # DEFAULT
+
+# Interrupt training early if accuracy goal is passed
+stop_when_goal_is_passed: True
