@@ -19,6 +19,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
         ax2 = fig.add_subplot(412)
         ax3 = fig.add_subplot(413)
         ax4 = fig.add_subplot(414)
+        ax5 = ax4.twinx()
         plt.ion()
         fig.show()
         fig.canvas.draw()
@@ -35,6 +36,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
     success_rate_avg = []
     success_rate_variance = []
     sender_symbols = []
+    symbol_probabilities = []
     sender = agent1
     receiver = agent2
 
@@ -45,13 +47,10 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
     p = 0.5
     q = stats.binom.cdf(err*n, n, p)
     p = 1 / n_images_to_guess_from
-    n = analyse_batches * batch_size
+    # n = analyse_batches * batch_size
     err = stats.binom.ppf(q, n, 1 - p) / n
     accuracy_goal = 1 - err
     print(f"Goal: {accuracy_goal:.4f} success rate")
-    # How much is needed to be confident
-    alpha = 0.99
-    accuracy_goal_confident = stats.binom.ppf(alpha, n, accuracy_goal) / n
 
     goal_reached = False
     for episode in range(1, n_episodes + 1):
@@ -71,6 +70,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
             receiver.remember(sender_state, sender_action, sender_reward, net="sender")
 
         batch_success.append(success)
+        symbol_probabilities.append(sender_probs)
 
         if not episode % batch_size:
             avg_success = sum(batch_success) / len(batch_success)
@@ -101,7 +101,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
                 success_rate_avg.append(sum(success_rate[-window:]) / window)
                 success_rate_variance.append(
                     sum([(x - success_rate_avg[-1])**2 for x in success_rate[-window:]]) / window)
-                if success_rate_avg[-1] >= accuracy_goal_confident and not goal_reached:
+                if success_rate_avg[-1] >= accuracy_goal and not goal_reached:
                     goal_reached = True
                     print(f"success rate > {accuracy_goal} reached in episode {episode} (p < 0.01)")
                     if stop_when_goal_is_passed:
@@ -120,6 +120,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
             ax2.clear()
             ax3.clear()
             ax4.clear()
+            ax5.clear()
             ax1.set_title("Sender loss")
             ax2.set_title("Receiver loss")
             ax3.set_title("Batch success rate")
@@ -131,11 +132,17 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
             ax2.plot(t[-analyse_batches:], recvr2_loss[-analyse_batches:], "c", label="Agent 2")
             ax2.legend(loc="lower left")
             ax3.plot(t[-analyse_batches:], success_rate[-analyse_batches:], "r.")
-            plot_colourline(t[-analyse_batches:], success_rate_avg[-analyse_batches:], success_rate_variance[-analyse_batches:], ax3)
-            ax4.hist(sender_symbols)
-            # print(sender_symbols[-analyse_steps:])
+            plot_colourline(t[-analyse_batches:], success_rate_avg[-analyse_batches:],
+                            success_rate_variance[-analyse_batches:], ax3)
+            n_symbols = len(symbol_probabilities[0])
+            ax4.hist(sender_symbols, range(n_symbols+1), align="mid")
+            ax5.hlines(np.sum(symbol_probabilities, axis=0) / batch_size, range(n_symbols), range(1, n_symbols + 1),
+                       linewidth=3, color="black")
+            ax5.set_ylim([0, 1])
             fig.canvas.draw()
             fig.canvas.flush_events()
+
+            symbol_probabilities = []
 
     print("Training finished")
     # plt.show(block=True)

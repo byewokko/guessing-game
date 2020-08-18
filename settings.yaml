@@ -41,7 +41,7 @@ vocabulary_size: 10
 embedding_size: 50
 
 # Number of images presented in each turn of the game
-n_active_images: 3
+n_active_images: 4
 
 # Exploration strategy: False gibbs or decay
 explore: gibbs

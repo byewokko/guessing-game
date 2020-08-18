@@ -1,6 +1,6 @@
 from utils.set_seed import set_seed
 
-set_seed(0)
+set_seed(2)
 
 import os
 import yaml
