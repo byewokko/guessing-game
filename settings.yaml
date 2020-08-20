@@ -5,7 +5,7 @@ mode: train
 model_dir: models
 
 # Weights file to load: file prefix or -null- (to start with a blank model)
-load_file: null
+load_file: False
 
 # Prefix used for saving weights result and log files
 save_file: "{TIMESTAMP}-sharedexp"
@@ -15,7 +15,7 @@ save_file: "{TIMESTAMP}-sharedexp"
 roles: fixed
 
 # Number of episodes to play in total
-n_episodes: 50000
+n_episodes: 1000
 
 # Training batch size, also the number of episodes between updates
 batch_size: 30
@@ -29,7 +29,7 @@ dataset: data/imagenet-200x65-vgg19.train.emb.gz
 #dataset: data/esp-10000-xception.emb.gz
 
 # Number of images to play with (-null- to keep the whole dataset)
-trim_dataset_to_n_images: null
+trim_dataset_to_n_images: False
 
 # Pick images based on categories (generated from the first column in the embedding file)
 use_categories: True

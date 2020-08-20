@@ -6,12 +6,16 @@ import scipy.stats as stats
 from utils.plot import plot_colourline
 
 
-def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_images_to_guess_from,
+def equivalent_error_rate(q1, err, q2, n=500):
+    cdf = stats.binom.cdf(err * n, n, q1)
+    return stats.binom.ppf(cdf, n, q2) / n
+
+
+def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_active_images,
                  roles="switch", show_plot=True, explore="gibbs", gibbs_temperature=0.01,
                  memory_sampling_distribution="linear", shared_experience=False, stop_when_goal_is_passed=False,
                  **kwargs):
-    # agent1.make_distribution(memory_sampling_distribution)
-    # agent2.make_distribution(memory_sampling_distribution)
+    result_dict = {"goal1_reached": None, "goal2_reached": None}
     if show_plot:
         fig = plt.figure(figsize=(8, 8))
         plt.subplots_adjust(hspace=0.65)
@@ -42,20 +46,16 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
 
     # Goal: with 2 images (50% chance) reach 90% accuracy
     # For other number of images compute equivalent accuracy level
-    err = 0.1
-    n = 1000
-    p = 0.5
-    q = stats.binom.cdf(err*n, n, p)
-    p = 1 / n_images_to_guess_from
-    # n = analyse_batches * batch_size
-    err = stats.binom.ppf(q, n, 1 - p) / n
-    accuracy_goal = 1 - err
-    print(f"Goal: {accuracy_goal:.4f} success rate")
+    goal1 = 1 - equivalent_error_rate(0.5, 0.1, 1 - 1 / n_active_images)
+    goal2 = 1 - equivalent_error_rate(0.5, 0.05, 1 - 1 / n_active_images)
+    goal1_reached = False
+    goal2_reached = False
+    print(f"Goal 1: {goal1:.4f} success rate")
+    print(f"Goal 2: {goal2:.4f} success rate")
 
-    goal_reached = False
     for episode in range(1, n_episodes + 1):
         game.reset()
-        sender_state = game.get_sender_state(n_images=n_images_to_guess_from, unique_categories=True)
+        sender_state = game.get_sender_state(n_images=n_active_images, unique_categories=True)
         sender_action, sender_probs = sender.act(sender_state, explore=explore, gibbs_temperature=gibbs_temperature)
         sender_symbols.append(int(sender_action))
         receiver_state = game.get_receiver_state(sender_action)
@@ -101,12 +101,6 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
                 success_rate_avg.append(sum(success_rate[-window:]) / window)
                 success_rate_variance.append(
                     sum([(x - success_rate_avg[-1])**2 for x in success_rate[-window:]]) / window)
-                if success_rate_avg[-1] >= accuracy_goal and not goal_reached:
-                    goal_reached = True
-                    print(f"success rate > {accuracy_goal} reached in episode {episode} (p < 0.01)")
-                    if stop_when_goal_is_passed:
-                        print("Stopping")
-                        break
             sendr1_loss.append(agent1.net["sender"].last_loss)
             sendr2_loss.append(agent2.net["sender"].last_loss)
             recvr1_loss.append(agent1.net["receiver"].last_loss)
@@ -135,7 +129,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
             plot_colourline(t[-analyse_batches:], success_rate_avg[-analyse_batches:],
                             success_rate_variance[-analyse_batches:], ax3)
             n_symbols = len(symbol_probabilities[0])
-            ax4.hist(sender_symbols, range(n_symbols+1), align="mid")
+            histogram = ax4.hist(sender_symbols, range(n_symbols+1), align="mid")
             ax5.hlines(np.sum(symbol_probabilities, axis=0) / batch_size, range(n_symbols), range(1, n_symbols + 1),
                        linewidth=3, color="black")
             ax5.set_ylim([0, 1])
@@ -144,8 +138,23 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_ima
 
             symbol_probabilities = []
 
+            result_dict["final_success_rate"] = success_rate_avg[-1]
+            result_dict["symbol_histogram_median"] = np.median(histogram[0])
+
+            if success_rate_avg[-1] >= goal1 and not goal1_reached:
+                goal1_reached = True
+                result_dict["goal1_reached"] = episode
+                print(f"success rate > {goal1} reached in episode {episode}")
+            if success_rate_avg[-1] >= goal2 and not goal2_reached:
+                goal2_reached = True
+                result_dict["goal1_reached"] = episode
+                print(f"success rate > {goal2} reached in episode {episode}")
+                if stop_when_goal_is_passed:
+                    print("Stopping")
+                    break
+
     print("Training finished")
-    # plt.show(block=True)
+    return result_dict
 
 
 def run_test(game, agent1, agent2, res_file, n_episodes, batch_size, n_active_images,

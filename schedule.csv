@@ -1,0 +1,10 @@
+mode,model_dir,load_file,save_file,roles,n_episodes,batch_size,dataset,trim_dataset_to_n_images,use_categories,vocabulary_size,embedding_size,n_active_images,explore,gibbs_temperature,sender_type,n_informed_filters,loss,batch_mode,memory_sampling_distribution,dropout,shared_experience,shared_embedding,out_activation,stop_when_goal_is_passed
+train,models,False,{TIMESTAMP}-sharedexp,fixed,50000,30,data/imagenet-200x65-vgg19.train.emb.gz,False,True,10,50,2,False,0,agnostic,20,binary_crossentropy,sample,linear,0,False,False,softmax,True
+train,models,False,{TIMESTAMP}-sharedexp,fixed,50000,30,data/imagenet-200x65-vgg19.train.emb.gz,False,True,10,50,2,False,0,informed,20,binary_crossentropy,sample,linear,0,False,False,softmax,True
+train,models,False,{TIMESTAMP}-sharedexp,fixed,50000,30,data/imagenet-200x65-vgg19.train.emb.gz,False,True,10,50,2,False,0,agnostic,20,binary_crossentropy,sample,linear,0,False,False,softmax,True
+train,models,False,{TIMESTAMP}-sharedexp,fixed,50000,30,data/imagenet-200x65-vgg19.train.emb.gz,False,True,10,50,2,False,0,agnostic,20,binary_crossentropy,sample,linear,0,False,False,softmax,True
+train,models,False,{TIMESTAMP}-sharedexp,fixed,50000,30,data/imagenet-200x65-vgg19.train.emb.gz,False,True,10,50,2,False,0,agnostic,20,binary_crossentropy,sample,linear,0,False,False,softmax,True
+train,models,False,{TIMESTAMP}-sharedexp,fixed,50000,30,data/imagenet-200x65-vgg19.train.emb.gz,False,True,10,50,2,False,0,agnostic,20,binary_crossentropy,sample,linear,0,False,False,softmax,True
+train,models,False,{TIMESTAMP}-sharedexp,fixed,50000,30,data/imagenet-200x65-vgg19.train.emb.gz,False,True,10,50,2,False,0,agnostic,20,binary_crossentropy,sample,linear,0,False,False,softmax,True
+train,models,False,{TIMESTAMP}-sharedexp,fixed,50000,30,data/imagenet-200x65-vgg19.train.emb.gz,False,True,10,50,2,False,0,agnostic,20,binary_crossentropy,sample,linear,0,False,False,softmax,True
+,,,,,,,,,,,,,,,,,,,,,,,,
