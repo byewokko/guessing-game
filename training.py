@@ -132,7 +132,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
             histogram = ax4.hist(sender_symbols, range(n_symbols+1), align="mid")
             ax5.hlines(np.sum(symbol_probabilities, axis=0) / batch_size, range(n_symbols), range(1, n_symbols + 1),
                        linewidth=3, color="black")
-            ax5.set_ylim([0, 1])
+            # ax5.set_ylim([0, 1])
             fig.canvas.draw()
             fig.canvas.flush_events()
 
@@ -140,6 +140,8 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
 
             result_dict["final_success_rate"] = success_rate_avg[-1]
             result_dict["symbol_histogram_median"] = np.median(histogram[0])
+            result_dict["symbol_histogram_mean"] = np.mean(histogram[0])
+            result_dict["symbol_histogram_std"] = np.std(histogram[0])
 
             if success_rate_avg[-1] >= goal1 and not goal1_reached:
                 goal1_reached = True
@@ -147,7 +149,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
                 print(f"success rate > {goal1} reached in episode {episode}")
             if success_rate_avg[-1] >= goal2 and not goal2_reached:
                 goal2_reached = True
-                result_dict["goal1_reached"] = episode
+                result_dict["goal2_reached"] = episode
                 print(f"success rate > {goal2} reached in episode {episode}")
                 if stop_when_goal_is_passed:
                     print("Stopping")

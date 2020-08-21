@@ -74,11 +74,13 @@ class MultiAgent(Agent):
         return self.net[self.role]
 
     def act(self, state, explore=False, gibbs_temperature=0.05):
-        assert explore in (False, "gibbs", "decay")
+        assert explore.lower() in (False, "gibbs", "decay", "false")
         state = [np.expand_dims(st, 0) for st in state]
         act_probs = self.active_net().predict(state)
         act_probs = np.squeeze(act_probs)
         if explore == "gibbs":
+            if act_probs.sum() != 1:
+                act_probs = act_probs / act_probs.sum()
             action = np.random.choice(range(len(act_probs)), 1, p=act_probs)
         elif explore == "decay":
             if np.random.rand() < self.exploration_rate:
