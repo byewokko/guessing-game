@@ -1,7 +1,4 @@
 mode,model_dir,load_file,save_file,roles,n_episodes,batch_size,dataset,use_categories,vocabulary_size,embedding_size,n_active_images,explore,gibbs_temperature,sender_type,n_informed_filters,loss,batch_mode,memory_sampling_distribution,shared_experience,shared_embedding,out_activation,stop_when_goal_is_passed
-train,models/local_only,False,{TIMESTAMP}-info-gibbs,fixed,50000,30,data/imagenet-200x65-vgg19.train.emb.gz,True,10,50,2,gibbs,0.1,informed,20,binary_crossentropy,sample,linear,False,False,softmax,True
-train,models/local_only,False,{TIMESTAMP}-info-gibbs,fixed,50000,30,data/imagenet-200x65-vgg19.train.emb.gz,True,10,50,3,gibbs,0.1,informed,20,binary_crossentropy,sample,linear,False,False,softmax,True
-train,models/local_only,False,{TIMESTAMP}-info-gibbs,fixed,50000,30,data/imagenet-200x65-vgg19.train.emb.gz,True,10,50,4,gibbs,0.1,informed,20,binary_crossentropy,sample,linear,False,False,softmax,True
 train,models/local_only,False,{TIMESTAMP}-info-gibbs,fixed,50000,30,data/imagenet-200x65-vgg19.train.emb.gz,True,10,50,5,gibbs,0.1,informed,20,binary_crossentropy,sample,linear,False,False,softmax,True
 train,models/local_only,False,{TIMESTAMP}-info-gibbs,fixed,50000,30,data/imagenet-200x65-vgg19.train.emb.gz,True,10,50,2,gibbs,0.1,informed,20,binary_crossentropy,sample,linear,False,False,sigmoid,True
 train,models/local_only,False,{TIMESTAMP}-info-gibbs,fixed,50000,30,data/imagenet-200x65-vgg19.train.emb.gz,True,10,50,4,gibbs,0.1,informed,20,binary_crossentropy,sample,linear,False,False,sigmoid,True

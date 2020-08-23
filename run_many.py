@@ -6,8 +6,8 @@ from datetime import datetime
 import run
 
 
-SCHEDULE_FILE = "schedule.csv"
-RESULTS_FILE = "results.csv"
+SCHEDULE_FILE = "schedule5.csv"
+RESULTS_FILE = "results/results5.csv"
 
 
 def main():
@@ -28,9 +28,10 @@ def main():
                 experiment_args["save_file"] = experiment_args["save_file"].format(TIMESTAMP=timestamp,
                                                                                    **experiment_args)
             row.loc["save_file"] = experiment_args["save_file"]
+            print(experiment_args["save_file"])
             results = run.run_training(**experiment_args)
             for k, v in results.items():
-                row[k] = v
+                row.loc[k] = v
             experiment_args["mode"] = "test"
             experiment_args["load_file"] = experiment_args["save_file"]
             filename = experiment_args["save_file"]

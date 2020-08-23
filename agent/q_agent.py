@@ -80,8 +80,10 @@ class MultiAgent(Agent):
         act_probs = np.squeeze(act_probs)
         if explore == "gibbs":
             if act_probs.sum() != 1:
-                act_probs = act_probs / act_probs.sum()
-            action = np.random.choice(range(len(act_probs)), 1, p=act_probs)
+                # Normalize probs for sampling, but not for gradient descent
+                action = np.random.choice(range(len(act_probs)), 1, p=act_probs/act_probs.sum())
+            else:
+                action = np.random.choice(range(len(act_probs)), 1, p=act_probs)
         elif explore == "decay":
             if np.random.rand() < self.exploration_rate:
                 if self.exploration_rate > self.exploration_min:
