@@ -46,8 +46,8 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
 
     # Goal: with 2 images (50% chance) reach 90% accuracy
     # For other number of images compute equivalent accuracy level
-    goal1 = 1 - equivalent_error_rate(0.5, 0.2, 1 - 1 / n_active_images)
-    goal2 = 1 - equivalent_error_rate(0.5, 0.1, 1 - 1 / n_active_images)
+    goal1 = 1 - equivalent_error_rate(0.5, 0.1, 1 - 1 / n_active_images)
+    goal2 = 1 - equivalent_error_rate(0.5, 0.05, 1 - 1 / n_active_images)
     goal1_reached = False
     goal2_reached = False
     print(f"Goal 1: {goal1:.4f} success rate")

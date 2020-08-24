@@ -6,8 +6,8 @@ from datetime import datetime
 import run
 
 
-SCHEDULE_FILE = "schedule5.csv"
-RESULTS_FILE = "results/results5.csv"
+SCHEDULE_FILE = "schedule6.csv"
+RESULTS_FILE = "results/results6.csv"
 
 
 def main():

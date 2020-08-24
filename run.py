@@ -105,7 +105,7 @@ def run_test(model_dir, load_file, save_file, dataset, use_categories,
     }
 
     for k in ("sender_type", "n_informed_filters", "embedding_size", "learning_rate", "gibbs_temperature",
-              "loss", "optimizer", "use_bias", "explore"):
+              "loss", "optimizer", "use_bias", "explore", "model_type"):
         if k in experiment_args:
             agent_args[k] = experiment_args[k]
 

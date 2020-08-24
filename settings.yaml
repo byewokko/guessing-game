@@ -8,17 +8,17 @@ model_dir: models
 load_file: False
 
 # Prefix used for saving weights result and log files
-save_file: "{TIMESTAMP}-sharedexp"
+save_file: "{TIMESTAMP}-new-net"
 
 # Roles mode: switch or fixed
-#roles: switch
-roles: fixed
+roles: switch
+#roles: fixed
 
 # Number of episodes to play in total
-n_episodes: 1000
+n_episodes: 15000
 
 # Training batch size, also the number of episodes between updates
-batch_size: 30
+batch_size: 20
 
 # Path to embedding file
 #dataset: data/imagenet-4000-vgg19.emb.gz
@@ -35,7 +35,7 @@ trim_dataset_to_n_images: False
 use_categories: True
 
 # Number of symbols that the agents use to communicate
-vocabulary_size: 10
+vocabulary_size: 50
 
 # Size of the first layer in the agents' networks
 embedding_size: 50
@@ -45,7 +45,7 @@ n_active_images: 4
 
 # Exploration strategy: False gibbs or decay
 explore: gibbs
-#explore: False
+#explore: none
 #explore: decay
 
 # Gibbs temperature value
@@ -56,7 +56,7 @@ gibbs_temperature: 0.1
 sender_type: informed
 
 # Number of CNN filters used by the informed sender
-n_informed_filters: 20
+n_informed_filters: 40
 
 # Agent loss function
 loss: binary_crossentropy
@@ -81,8 +81,8 @@ memory_sampling_distribution: linear
 dropout: 0
 
 # Sharing experience with both components of each agent
-shared_experience: False
-#shared_experience: True
+#shared_experience: False
+shared_experience: True
 
 # Share the first, embedding layer between the sender and receiver component within each agent
 #shared_embedding: False
@@ -94,3 +94,5 @@ out_activation: softmax  # DEFAULT
 
 # Interrupt training early if accuracy goal is passed
 stop_when_goal_is_passed: True
+
+model_type: new
