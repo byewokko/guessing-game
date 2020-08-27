@@ -71,6 +71,8 @@ class MultiAgent(Agent):
             self._build_model(**kwargs)
         elif model_type == "new":
             self._build_model_alt(**kwargs)
+        elif model_type == "reinforce":
+            self._build_model_reinforce(**kwargs)
 
     def active_net(self):
         assert self.role in self.net.keys()
@@ -338,6 +340,129 @@ class MultiAgent(Agent):
 
         self.net["receiver"].model = Model([*inputs, sym_input], receiver_out)
         self.net["receiver"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate))
+        self.net["receiver"].input_shapes = input_shapes
+        self.net["receiver"].output_size = n_input_images
+        self.net["receiver"].reset_batch()
+        self.net["receiver"].reset_memory()
+
+    def _build_model_reinforce(self, input_shapes, n_symbols, embedding_size=EMBEDDING_SIZE, n_informed_filters=20,
+                     use_bias=USE_BIAS, optimizer=OPTIMIZER, learning_rate=LEARNING_RATE,
+                     mode="dot", sender_type="agnostic", dropout=0, shared_embedding=True,
+                     out_activation="softmax", **kwargs):
+        # Shared part
+        n_input_images = len(input_shapes) - 1
+        inputs = [layers.Input(shape=input_shapes[i],
+                               name=f"input_{i}")
+                  for i in range(n_input_images)]
+        embs = [layers.Dense(embedding_size,
+                             activation='linear',
+                             use_bias=use_bias,
+                             name=f"embed_{i}")
+                for i in range(n_input_images)]
+        emb = layers.Dense(embedding_size,
+                           activation='linear',
+                           use_bias=use_bias,
+                           name=f"embed_img")
+
+        # imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
+        imgs = [emb(inputs[i]) for i in range(n_input_images)]  # same embedding layer for all images
+
+        if dropout:
+            imgs = [layers.Dropout(dropout)(imgs[i]) for i in range(n_input_images)]
+
+        if isinstance(optimizer, str):
+            if optimizer.lower() == "adam":
+                optimizer = optim.Adam
+            else:
+                raise TypeError(f"Unknown optimizer '{optimizer}'")
+
+        if sender_type == "agnostic":
+            out = [layers.Activation("sigmoid")(imgs[i]) for i in range(n_input_images)]
+            concat = layers.concatenate(out, axis=-1)
+            out = layers.Dense(n_symbols,
+                               use_bias=use_bias,
+                               )(concat)
+        elif sender_type == "informed":
+            stack = layers.Lambda(lambda x: K.stack(x, axis=1), name="stack")
+            reshape = layers.Reshape((-1, embedding_size, 1))
+            feat_filters = layers.Conv2D(filters=n_informed_filters,
+                                         kernel_size=(n_input_images, 1),
+                                         activation="sigmoid",
+                                         data_format="channels_last",
+                                         name="feature_filters"
+                                         )
+
+            voc_filter = layers.Conv2D(1, (1, n_informed_filters),
+                                       activation="linear",
+                                       data_format="channels_first",
+                                       name="vocab_filter"
+                                       )
+
+            dense = layers.Dense(n_symbols, name="output_dense")
+            out = dense(layers.Flatten()(voc_filter(feat_filters(reshape(stack(imgs))))))
+        else:
+            raise KeyError(f"Unknown sender type: {sender_type}")
+
+        train_out = out
+
+        # Common sender part
+        if self.gibbs_temperature != 0:
+            out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
+        # out = layers.Activation("softmax")(out)
+        out = layers.Activation(out_activation)(out)
+
+        reward = layers.Input((1,), name="reward")
+
+        def custom_loss(y_true, y_pred):
+            # y_pred = layers.Activation("relu")(y_pred)
+            # FIXME: NaN PROBLEM, log receives non-positive input, produces NaN loss value
+            return K.sum(K.log(y_pred) * y_true) * reward
+            log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
+            return K.mean(log_lik * reward, keepdims=True)
+
+        self.net["sender"].model_predict = Model(inputs, out)
+        self.net["sender"].model_train = Model([*inputs, reward], train_out)
+        self.net["sender"].model_train.compile(loss=custom_loss, optimizer=optimizer(lr=learning_rate))
+        self.net["sender"].input_shapes = input_shapes[:-1]
+        self.net["sender"].output_size = n_symbols
+        self.net["sender"].reset_batch()
+        self.net["sender"].reset_memory()
+
+        # Receiver part
+        symbol_shape = input_shapes[-1]
+        sym_input = layers.Input(shape=symbol_shape, dtype="int32", name="input_sym")
+        emb_sym = layers.Embedding(input_dim=n_symbols,
+                                   output_dim=embedding_size,
+                                   name=f"embed_sym")
+        symbol = layers.Flatten()(emb_sym(sym_input))
+        symbol = layers.Dropout(dropout)(symbol)
+
+        if not shared_embedding:
+            imgs = [emb(inputs[i]) for i in range(n_input_images)]
+
+        # mode = "dense"
+        if mode == "dot":
+            dot = layers.Dot(axes=1)
+            dot_prods = [dot([img, symbol]) for img in imgs]
+            out = layers.concatenate(dot_prods, axis=-1)
+            # out = layers.Dense(n_input_images)(out)
+        elif mode == "dense":
+            out = layers.concatenate([*imgs, symbol], axis=-1)
+            out = layers.Dense(n_input_images,
+                               # activation="sigmoid",
+                               name=f"dense_join")(out)
+        else:
+            raise ValueError(f"'{mode}' is not a valid mode.")
+
+        train_out = out
+        if self.gibbs_temperature != 0:
+            out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
+        # out = layers.Activation("softmax")(out)
+        out = layers.Activation(out_activation)(out)
+
+        self.net["receiver"].model_train = Model([*inputs, sym_input, reward], train_out)
+        self.net["receiver"].model_train.compile(loss=custom_loss, optimizer=optimizer(lr=learning_rate))
+        self.net["receiver"].model_predict = Model([*inputs, sym_input], out)
         self.net["receiver"].input_shapes = input_shapes
         self.net["receiver"].output_size = n_input_images
         self.net["receiver"].reset_batch()

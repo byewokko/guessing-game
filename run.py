@@ -45,7 +45,7 @@ def run_training(model_dir, load_file, save_file, dataset, use_categories,
 
     for k in ("sender_type", "n_informed_filters", "embedding_size", "learning_rate", "gibbs_temperature",
               "loss", "optimizer", "use_bias", "explore", "batch_mode", "memory_sampling_distribution", "dropout",
-              "shared_embedding", "out_activation"):
+              "shared_embedding", "out_activation", "model_type"):
         if k in experiment_args:
             agent_args[k] = experiment_args[k]
 

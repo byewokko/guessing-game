@@ -8,6 +8,8 @@ class Net:
         self.input_shapes = input_shapes
         self.output_size = output_size
         self.model = None
+        self.model_predict = None
+        self.model_train = None
         self.batch_states = None
         self.batch_actions = None
         self.batch_rewards = None
@@ -19,19 +21,31 @@ class Net:
         self.memory_sampling_dist = None
 
     def predict(self, *args, **kwargs):
+        if self.model_predict is not None:
+            return self.model_predict.predict(*args, **kwargs)
         return self.model.predict(*args, **kwargs)
 
     def train_on_batch(self, *args, **kwargs):
+        if self.model_train is not None:
+            return self.model_train.train_on_batch(*args, **kwargs)
         return self.model.train_on_batch(*args, **kwargs)
 
     def batch_train(self):
-        q_values = self.model.predict(self.batch_states)
-        for i in range(len(self.batch_rewards)):
-            q_values[i][self.batch_actions[i].astype("bool")] = self.batch_rewards[i]
-        self.last_loss = self.model.train_on_batch(
-            self.batch_states,
-            q_values
-        )
+        if self.model_train is not None:
+            model = self.model_train
+            self.last_loss = self.model_train.train_on_batch(
+                [np.stack(stack) for stack in [*self.batch_states, self.batch_rewards]],
+                np.stack(self.batch_actions)
+            )
+        else:
+            model = self.model
+            q_values = model.predict(self.batch_states)
+            for i in range(len(self.batch_rewards)):
+                q_values[i][self.batch_actions[i].astype("bool")] = self.batch_rewards[i]
+            self.last_loss = model.train_on_batch(
+                self.batch_states,
+                q_values
+            )
         self.reset_batch()
         return self.last_loss
 
@@ -95,7 +109,13 @@ class Net:
         self.memory_rewards = []
 
     def load(self, name):
-        self.model.load_weights(name)
+        if self.model_train is not None:
+            self.model_train.load_weights(name)
+        else:
+            self.model.load_weights(name)
 
     def save(self, name):
-        self.model.save_weights(name)
+        if self.model_train is not None:
+            self.model_train.save_weights(name)
+        else:
+            self.model.save_weights(name)

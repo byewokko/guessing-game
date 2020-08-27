@@ -149,11 +149,11 @@ class Sender(Agent):
 
         def custom_loss(y_true, y_pred):
             # Cross-entropy 1 (??)
-            # log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
-            # return K.mean(log_lik * reward, keepdims=True)
+            log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
+            return K.mean(log_lik * reward, keepdims=True)
 
             # Cross-entropy 2
-            return K.sum(K.log(y_pred) * y_true) * reward
+            # return K.sum(K.log(y_pred) * y_true) * reward
 
             # RMS loss
             # return K.mean((K.square(y_pred - y_true))) * reward
