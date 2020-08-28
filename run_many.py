@@ -6,12 +6,25 @@ from datetime import datetime
 import run
 
 
-SCHEDULE_FILE = "schedule6.csv"
+QUEUE_FILE = "queue6.csv"
 RESULTS_FILE = "results/results6.csv"
 
 
 def main():
-    with open(SCHEDULE_FILE) as f:
+    if len(sys.argv) == 2:
+        queue_file = sys.argv[1]
+        if queue_file.endswith(".csv"):
+            results_file = queue_file.replace(".csv", ".results.csv")
+        else:
+            results_file = f"{queue_file}.results.csv"
+    elif len(sys.argv) > 2:
+        queue_file = sys.argv[1]
+        results_file = sys.argv[2]
+    else:
+        queue_file = QUEUE_FILE
+        results_file = RESULTS_FILE
+
+    with open(queue_file) as f:
         df = pd.read_csv(f)
     for i in df.index:
         row = df.iloc[i, :]
@@ -39,10 +52,10 @@ def main():
             print(f"Writing parameters to '{param_filename}' ...")
             with open(param_filename, "w") as f:
                 yaml.safe_dump({str(k): str(v) for k, v in experiment_args.items()}, f, indent=4)
-            if not os.path.isfile(RESULTS_FILE):
-                pd.DataFrame(row).transpose().to_csv(RESULTS_FILE, mode="a", header=True)
+            if not os.path.isfile(results_file):
+                pd.DataFrame(row).transpose().to_csv(results_file, mode="a", header=True)
             else:
-                pd.DataFrame(row).transpose().to_csv(RESULTS_FILE, mode="a", header=False)
+                pd.DataFrame(row).transpose().to_csv(results_file, mode="a", header=False)
         else:
             raise ValueError(f"Invalid mode: '{mode}'")
 

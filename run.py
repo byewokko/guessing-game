@@ -63,16 +63,12 @@ def run_training(model_dir, load_file, save_file, dataset, use_categories,
 
     results = None
 
-    try:
-        results = training.run_training(game, agent1, agent2, n_active_images=n_active_images,
-                                        **experiment_args)
-    except (InterruptedError, KeyboardInterrupt):
-        filename = f"{filename}-interrupted"
-    finally:
-        if save_file:
-            print(f"Saving weights to '{filename}.*' ...")
-            agent1.save(f"{filename}.01")
-            agent2.save(f"{filename}.02")
+    results = training.run_training(game, agent1, agent2, n_active_images=n_active_images,
+                                    **experiment_args)
+    if save_file:
+        print(f"Saving weights to '{filename}.*' ...")
+        agent1.save(f"{filename}.01")
+        agent2.save(f"{filename}.02")
 
     print(results)
     return results

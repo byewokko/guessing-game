@@ -140,7 +140,6 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
 
             result_dict["final_success_rate"] = success_rate_avg[-1]
             result_dict["symbol_histogram_median"] = np.median(histogram[0])
-            result_dict["symbol_histogram_mean"] = np.mean(histogram[0])
             result_dict["symbol_histogram_std"] = np.std(histogram[0])
 
             if success_rate_avg[-1] >= goal1 and not goal1_reached:

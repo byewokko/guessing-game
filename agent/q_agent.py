@@ -414,14 +414,15 @@ class MultiAgent(Agent):
         reward = layers.Input((1,), name="reward")
 
         def custom_loss(y_true, y_pred):
-            # y_pred = layers.Activation("relu")(y_pred)
+            # y_pred = layers.Activation("softplus")(y_pred)
             # FIXME: NaN PROBLEM, log receives non-positive input, produces NaN loss value
-            return K.sum(K.log(y_pred) * y_true) * reward
+            # return K.sum(K.log(y_pred) * y_true) * reward
             log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
             return K.mean(log_lik * reward, keepdims=True)
 
         self.net["sender"].model_predict = Model(inputs, out)
         self.net["sender"].model_train = Model([*inputs, reward], train_out)
+        # self.net["sender"].model_train = Model([*inputs, reward], out)
         self.net["sender"].model_train.compile(loss=custom_loss, optimizer=optimizer(lr=learning_rate))
         self.net["sender"].input_shapes = input_shapes[:-1]
         self.net["sender"].output_size = n_symbols
@@ -461,6 +462,7 @@ class MultiAgent(Agent):
         out = layers.Activation(out_activation)(out)
 
         self.net["receiver"].model_train = Model([*inputs, sym_input, reward], train_out)
+        # self.net["receiver"].model_train = Model([*inputs, sym_input, reward], out)
         self.net["receiver"].model_train.compile(loss=custom_loss, optimizer=optimizer(lr=learning_rate))
         self.net["receiver"].model_predict = Model([*inputs, sym_input], out)
         self.net["receiver"].input_shapes = input_shapes

@@ -18,7 +18,7 @@ roles: fixed
 n_episodes: 15000
 
 # Training batch size, also the number of episodes between updates
-batch_size: 30
+batch_size: 20
 
 # Path to embedding file
 #dataset: data/imagenet-4000-vgg19.emb.gz
@@ -41,14 +41,15 @@ vocabulary_size: 10
 embedding_size: 50
 
 # Number of images presented in each turn of the game
-n_active_images: 2
+n_active_images: 4
 
-# Exploration strategy: False gibbs or decay
+# Exploration strategy: none, gibbs or decay
 #explore: gibbs
 explore: none
 #explore: decay
 
 # Gibbs temperature value
+# The temperature layer is omitted if gibbs_temperature is 0
 gibbs_temperature: 0
 
 # Sender type: agnostic or informed
@@ -76,13 +77,14 @@ batch_mode: sample
 # - linear, quadratic: probability distribution is skewed in favor of the newer memory entries
 memory_sampling_distribution: linear
 
-# Dropout applied after first layer
+# Dropout applied after first (embedding) layer
 # (doesn't make difference)
 dropout: 0
 
-# Sharing experience with both components of each agent
-shared_experience: False
-#shared_experience: True
+# Sharing experience with both agents
+# Motivation: Player keeps track of his opponent's actions as well to improve his own strategy.
+#shared_experience: False
+shared_experience: True
 
 # Share the first, embedding layer between the sender and receiver component within each agent
 shared_embedding: False
@@ -92,9 +94,11 @@ shared_embedding: False
 #out_activation: sigmoid
 out_activation: softmax  # DEFAULT
 
-# Interrupt training early if accuracy goal is passed
+# Interrupt training early if accuracy goal (significance level) is passed
+# The goal is specified in `training.py`
 stop_when_goal_is_passed: True
 
+# Model type: "old" is the standard model, other options are breaking/in-development
+model_type: old
 #model_type: new
-#model_type: old
-model_type: reinforce
+#model_type: reinforce
