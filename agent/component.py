@@ -8,6 +8,7 @@ class Net:
         self.input_shapes = input_shapes
         self.output_size = output_size
         self.model = None
+        self.emb_output = None
         self.model_predict = None
         self.model_train = None
         self.batch_states = None
@@ -25,6 +26,9 @@ class Net:
             return self.model_predict.predict(*args, **kwargs)
         return self.model.predict(*args, **kwargs)
 
+    def embed(self, *args, **kwargs):
+        return self.emb_output.predict(*args, **kwargs)
+
     def train_on_batch(self, *args, **kwargs):
         if self.model_train is not None:
             return self.model_train.train_on_batch(*args, **kwargs)
@@ -32,15 +36,18 @@ class Net:
 
     def batch_train(self):
         if self.model_train is not None:
+            # Reinforce: gradient ascent
             model = self.model_train
             self.last_loss = self.model_train.train_on_batch(
                 [np.stack(stack) for stack in [*self.batch_states, self.batch_rewards]],
                 np.stack(self.batch_actions)
             )
         else:
+            # Q-learning
             model = self.model
             q_values = model.predict(self.batch_states)
             for i in range(len(self.batch_rewards)):
+                # TODO: explore this. do not simply replace with the reward, try averaging or something
                 q_values[i][self.batch_actions[i].astype("bool")] = self.batch_rewards[i]
             self.last_loss = model.train_on_batch(
                 self.batch_states,

@@ -129,7 +129,7 @@ def run_test(model_dir, load_file, save_file, dataset, use_categories,
 
 def main(experiment_args):
     mode = experiment_args["mode"]
-    if mode == "test":
+    if mode in ("test"):
         assert experiment_args["load_file"]
         run_test(**experiment_args)
     elif mode == "train":

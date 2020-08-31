@@ -137,6 +137,9 @@ class MultiAgent(Agent):
         self.net["sender"].model.save_weights(f"{name}.snd")
         self.net["receiver"].model.save_weights(f"{name}.rcv")
 
+    def get_embedding(self, image_vector):
+        return self.active_net().embed(image_vector)
+
     def get_active_name(self):
         return f"{self.name}.{self.role}"
 
@@ -204,8 +207,11 @@ class MultiAgent(Agent):
         # out = layers.Activation("softmax")(out)
         out = layers.Activation(out_activation)(out)
 
+        aux_input = layers.Input(shape=input_shapes[0])
+
         self.net["sender"].model = Model(inputs, out)
         self.net["sender"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate))
+        self.net["sender"].emb_output = Model(aux_input, emb(aux_input))
         self.net["sender"].input_shapes = input_shapes[:-1]
         self.net["sender"].output_size = n_symbols
         self.net["sender"].reset_batch()
@@ -221,6 +227,10 @@ class MultiAgent(Agent):
         symbol = layers.Dropout(dropout)(symbol)
 
         if not shared_embedding:
+            emb = layers.Dense(embedding_size,
+                               activation='linear',
+                               use_bias=use_bias,
+                               name=f"embed_img_rcv")
             imgs = [emb(inputs[i]) for i in range(n_input_images)]
 
         # mode = "dense"
@@ -242,8 +252,11 @@ class MultiAgent(Agent):
         # out = layers.Activation("softmax")(out)
         out = layers.Activation(out_activation)(out)
 
+        aux_input = layers.Input(shape=input_shapes[0])
+
         self.net["receiver"].model = Model([*inputs, sym_input], out)
         self.net["receiver"].model.compile(loss=loss, optimizer=optimizer(lr=learning_rate))
+        self.net["receiver"].emb_output = Model(aux_input, emb(aux_input))
         self.net["receiver"].input_shapes = input_shapes
         self.net["receiver"].output_size = n_input_images
         self.net["receiver"].reset_batch()

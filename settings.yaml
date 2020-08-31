@@ -8,7 +8,7 @@ model_dir: models
 load_file: False
 
 # Prefix used for saving weights result and log files
-save_file: "{TIMESTAMP}-reinforce"
+save_file: "{TIMESTAMP}-basic"
 
 # Roles mode: switch or fixed
 #roles: switch
@@ -41,7 +41,7 @@ vocabulary_size: 10
 embedding_size: 50
 
 # Number of images presented in each turn of the game
-n_active_images: 4
+n_active_images: 2
 
 # Exploration strategy: none, gibbs or decay
 #explore: gibbs
@@ -83,8 +83,8 @@ dropout: 0
 
 # Sharing experience with both agents
 # Motivation: Player keeps track of his opponent's actions as well to improve his own strategy.
-#shared_experience: False
-shared_experience: True
+shared_experience: False
+#shared_experience: True
 
 # Share the first, embedding layer between the sender and receiver component within each agent
 shared_embedding: False
