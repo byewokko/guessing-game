@@ -5,6 +5,10 @@ import scipy.stats as stats
 
 from utils.plot import plot_colourline
 
+SHOW_BATCHES = 200
+AVG_WINDOW = 20
+EARLY_STOPPING_BATCHES = 100
+
 
 def equivalent_error_rate(q1, err, q2, n=500):
     cdf = stats.binom.cdf(err * n, n, q1)
@@ -29,8 +33,6 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
         fig.canvas.draw()
 
     t = []
-    analyse_batches = 200
-    window = 20
     batch_success = []
     success_rate = []
     sendr1_loss = []
@@ -52,6 +54,9 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
     goal2_reached = False
     print(f"Goal 1: {goal1:.4f} success rate")
     print(f"Goal 2: {goal2:.4f} success rate")
+
+    early_stopping_max = 0
+    early_stopping_counter = EARLY_STOPPING_BATCHES
 
     for episode in range(1, n_episodes + 1):
         game.reset()
@@ -82,7 +87,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
                                    memory_sampling_distribution=memory_sampling_distribution)
             receiver.batch_train()
 
-            sender_symbols = sender_symbols[-analyse_batches:]
+            sender_symbols = sender_symbols[-SHOW_BATCHES:]
 
             if roles == "switch":
                 sender.switch_role()
@@ -94,13 +99,23 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
             # PLOT PROGRESS
             t.append(episode)
             success_rate.append(avg_success)
-            if len(success_rate) < window:
+            if len(success_rate) < AVG_WINDOW:
                 success_rate_avg.append(np.nan)
                 success_rate_variance.append(np.nan)
             else:
-                success_rate_avg.append(sum(success_rate[-window:]) / window)
+                success_rate_avg.append(sum(success_rate[-AVG_WINDOW:]) / AVG_WINDOW)
                 success_rate_variance.append(
-                    sum([(x - success_rate_avg[-1])**2 for x in success_rate[-window:]]) / window)
+                    sum([(x - success_rate_avg[-1])**2 for x in success_rate[-AVG_WINDOW:]]) / AVG_WINDOW)
+                if success_rate_avg[-1] > early_stopping_max:
+                    print("early stopping counter reset")
+                    early_stopping_max = success_rate_avg[-1]
+                    early_stopping_counter = EARLY_STOPPING_BATCHES
+                else:
+                    early_stopping_counter -= 1
+                    if early_stopping_counter < 0:
+                        print("EARLY STOPPING")
+                        break
+
             sendr1_loss.append(agent1.net["sender"].last_loss)
             sendr2_loss.append(agent2.net["sender"].last_loss)
             recvr1_loss.append(agent1.net["receiver"].last_loss)
@@ -119,20 +134,28 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
             ax2.set_title("Receiver loss")
             ax3.set_title("Batch success rate")
             ax4.set_title("Sender symbols histogram")
-            ax1.plot(t[-analyse_batches:], sendr1_loss[-analyse_batches:], "m", label="Agent 1")
-            ax1.plot(t[-analyse_batches:], sendr2_loss[-analyse_batches:], "c", label="Agent 2")
+            ax1.plot(t[-SHOW_BATCHES:], sendr1_loss[-SHOW_BATCHES:], "m", label="Agent 1")
+            ax1.plot(t[-SHOW_BATCHES:], sendr2_loss[-SHOW_BATCHES:], "c", label="Agent 2")
             ax1.legend(loc="lower left")
-            ax2.plot(t[-analyse_batches:], recvr1_loss[-analyse_batches:], "m", label="Agent 1")
-            ax2.plot(t[-analyse_batches:], recvr2_loss[-analyse_batches:], "c", label="Agent 2")
+            ax2.plot(t[-SHOW_BATCHES:], recvr1_loss[-SHOW_BATCHES:], "m", label="Agent 1")
+            ax2.plot(t[-SHOW_BATCHES:], recvr2_loss[-SHOW_BATCHES:], "c", label="Agent 2")
             ax2.legend(loc="lower left")
-            ax3.plot(t[-analyse_batches:], success_rate[-analyse_batches:], "r.")
-            plot_colourline(t[-analyse_batches:], success_rate_avg[-analyse_batches:],
-                            success_rate_variance[-analyse_batches:], ax3)
+            ax3.plot(t[-SHOW_BATCHES:], success_rate[-SHOW_BATCHES:], "r.")
+            plot_colourline(t[-SHOW_BATCHES:], success_rate_avg[-SHOW_BATCHES:],
+                            success_rate_variance[-SHOW_BATCHES:], ax3)
             n_symbols = len(symbol_probabilities[0])
             histogram = ax4.hist(sender_symbols, range(n_symbols+1), align="mid")
-            ax5.hlines(np.sum(symbol_probabilities, axis=0) / batch_size, range(n_symbols), range(1, n_symbols + 1),
-                       linewidth=3, color="black")
+            probs_mean = np.mean(symbol_probabilities, axis=0)
+            probs_std = np.std(symbol_probabilities, axis=0)
+            ax5.hlines(probs_mean, range(n_symbols), range(1, n_symbols + 1),
+                       linewidth=3, color="magenta")
+            ax5.hlines(probs_mean + probs_std, range(n_symbols), range(1, n_symbols + 1),
+                       linewidth=1, color="black")
+            ax5.hlines(probs_mean - probs_std, range(n_symbols), range(1, n_symbols + 1),
+                       linewidth=1, color="black")
             # ax5.set_ylim([0, 1])
+            # ax5.boxplot(np.stack(symbol_probabilities).T)
+            # ax5.boxplot(symbol_probabilities)
             fig.canvas.draw()
             fig.canvas.flush_events()
 

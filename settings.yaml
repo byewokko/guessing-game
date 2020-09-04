@@ -53,11 +53,11 @@ explore: none
 gibbs_temperature: 0
 
 # Sender type: agnostic or informed
-#sender_type: agnostic
-sender_type: informed
+sender_type: agnostic
+#sender_type: informed
 
 # Number of CNN filters used by the informed sender
-n_informed_filters: 40
+n_informed_filters: 20
 
 # Agent loss function
 loss: binary_crossentropy
@@ -91,14 +91,14 @@ shared_embedding: False
 #shared_embedding: True
 
 # Activation function applied to the network output
-#out_activation: sigmoid
-out_activation: softmax  # DEFAULT
+out_activation: sigmoid
+#out_activation: softmax  # DEFAULT
 
 # Interrupt training early if accuracy goal (significance level) is passed
 # The goal is specified in `training.py`
 stop_when_goal_is_passed: True
 
 # Model type: "old" is the standard model, other options are breaking/in-development
-model_type: old
+#model_type: old
 #model_type: new
-#model_type: reinforce
+model_type: reinforce
