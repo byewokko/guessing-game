@@ -20,6 +20,14 @@ EXPLORATION_FLOOR = .02
 MAX_MEMORY = 2000
 
 
+def softmax(X, theta=1.0):
+    y = X * theta
+    y = y - np.max(y)
+    y = np.exp(y)
+    y = y / np.sum(y)
+    return y
+
+
 class Agent:
     input_type = "data"
 
@@ -67,6 +75,7 @@ class MultiAgent(Agent):
         super().__init__(**kwargs)
         self.net = {"sender": component.Net(),
                     "receiver": component.Net()}
+        self.model_type = model_type
         if model_type == "old":
             self._build_model(**kwargs)
         elif model_type == "new":
@@ -80,30 +89,30 @@ class MultiAgent(Agent):
         assert self.role in self.net.keys()
         return self.net[self.role]
 
-    def act(self, state, explore=False, gibbs_temperature=0.05):
+    def act(self, state, explore=False, gibbs_temperature=1.):
         assert explore.lower() in (False, "gibbs", "decay", "false", "none")
         state = [np.expand_dims(st, 0) for st in state]
-        act_probs = self.active_net().predict(state)
-        act_probs = np.squeeze(act_probs)
+        act_values = self.active_net().predict(state)
+        act_values = np.squeeze(act_values)
         if explore == "gibbs":
-            if np.any(np.isnan(act_probs)):
-                print(act_probs)
-            if act_probs.sum() != 1:
-                # Normalize probs for sampling, but not for gradient descent
-                action = np.random.choice(range(len(act_probs)), 1, p=act_probs/act_probs.sum())
+            if np.any(np.isnan(act_values)):
+                print(act_values)
+            if self.model_type == "reinforce":
+                probs = softmax(act_values, self.gibbs_temperature)
+                action = np.random.choice(range(len(act_values)), 1, p=probs)
             else:
-                action = np.random.choice(range(len(act_probs)), 1, p=act_probs)
+                action = np.random.choice(range(len(act_values)), 1, p=act_values)
         elif explore == "decay":
             if np.random.rand() < self.exploration_rate:
                 if self.exploration_rate > self.exploration_min:
                     self.exploration_rate *= self.exploration_rate_decay
-                action = np.random.choice(range(len(act_probs)), 1)
+                action = np.random.choice(range(len(act_values)), 1)
             else:
-                action = np.argmax(act_probs)
+                action = np.argmax(act_values)
         else:
-            action = np.argmax(act_probs)
-        # self.last_action = (state, action, act_probs)
-        return action, act_probs
+            action = np.argmax(act_values)
+        # self.last_action = (state, action, act_values)
+        return action, act_values
 
     def remember(self, state, action, reward, net=None):
         if not net:
@@ -378,10 +387,69 @@ class MultiAgent(Agent):
         self.net["receiver"].reset_batch()
         self.net["receiver"].reset_memory()
 
-    def _build_model_reinforce(self, input_shapes, n_symbols, embedding_size=EMBEDDING_SIZE, n_informed_filters=20,
-                     use_bias=USE_BIAS, optimizer=OPTIMIZER, learning_rate=LEARNING_RATE,
-                     mode="dot", sender_type="agnostic", dropout=0, shared_embedding=True,
-                     out_activation="softmax", **kwargs):
+
+class MultiAgentReinforce(Agent):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.net = {"sender": component.Net(),
+                    "receiver": component.Net()}
+
+    def active_net(self):
+        assert self.role in self.net.keys()
+        return self.net[self.role]
+
+    def act(self, state, explore="gibbs", gibbs_temperature=1.):
+        state = [np.expand_dims(st, 0) for st in state]
+        act_values = self.active_net().predict(state)
+        act_values = np.squeeze(act_values)
+        if explore == "gibbs":
+            if np.any(np.isnan(act_values)):
+                print(act_values)
+            probs = softmax(act_values, self.gibbs_temperature)
+            action = np.random.choice(range(len(act_values)), 1, p=probs)
+        else:
+            action = np.argmax(act_values)
+        # self.last_action = (state, action, act_values)
+        return action, act_values
+
+    def remember(self, state, action, reward, net=None):
+        if not net:
+            self.active_net().remember(state, action, reward)
+        else:
+            self.net[net].remember(state, action, reward)
+
+    def prepare_batch(self, size: int, **kwargs):
+        self.active_net().prepare_batch(size, **kwargs)
+
+    def batch_train(self):
+        self.last_loss = self.active_net().batch_train()
+
+    def switch_role(self):
+        if self.role == "sender":
+            self.set_role("receiver")
+        else:
+            self.set_role("sender")
+
+    def load(self, name):
+        self.net["sender"].model.load_weights(f"{name}.snd")
+        self.net["receiver"].model.load_weights(f"{name}.rcv")
+
+    def save(self, name=None):
+        if not name:
+            time = dt.now().strftime("%y%m%d-%H%M")
+            name = f"model-{time}"
+        self.net["sender"].model.save_weights(f"{name}.snd")
+        self.net["receiver"].model.save_weights(f"{name}.rcv")
+
+    def get_embedding(self, image_vector):
+        return self.active_net().embed(image_vector)
+
+    def get_active_name(self):
+        return f"{self.name}.{self.role}"
+
+    def _build_model(self, input_shapes, n_symbols, embedding_size=EMBEDDING_SIZE, n_informed_filters=20,
+                               optimizer=OPTIMIZER, learning_rate=LEARNING_RATE,
+                               sender_type="agnostic", shared_embedding=True, **kwargs):
         print("-!- Using REINFORCE model -!-")
         print("Following user settings will be ignored:")
         print("out_activation, sender_type, optimizer, dropout, shared_embedding")
@@ -392,12 +460,10 @@ class MultiAgent(Agent):
                   for i in range(n_input_images)]
         embs = [layers.Dense(embedding_size,
                              activation='linear',
-                             use_bias=use_bias,
                              name=f"embed_{i}")
                 for i in range(n_input_images)]
         emb = layers.Dense(embedding_size,
                            activation='linear',
-                           use_bias=use_bias,
                            name=f"embed_img")
 
         imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
@@ -414,9 +480,7 @@ class MultiAgent(Agent):
 
         out = [layers.Activation("sigmoid")(imgs[i]) for i in range(n_input_images)]
         concat = layers.concatenate(out, axis=-1)
-        out = layers.Dense(n_symbols,
-                           use_bias=use_bias,
-                           )(concat)
+        out = layers.Dense(n_symbols)(concat)
 
         out = layers.Activation("sigmoid")(out)
         train_out = out
@@ -460,12 +524,10 @@ class MultiAgent(Agent):
         if not shared_embedding:
             embs = [layers.Dense(embedding_size,
                                  activation='linear',
-                                 use_bias=use_bias,
                                  name=f"embed_{i}")
                     for i in range(n_input_images)]
             emb = layers.Dense(embedding_size,
                                activation='linear',
-                               use_bias=use_bias,
                                name=f"embed_img")
 
             imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
@@ -492,13 +554,8 @@ class MultiAgent(Agent):
             raise KeyError(f"rcv_mode: '{rcv_mode}'")
 
         train_out = out
-        # if self.gibbs_temperature != 0:
-        #     out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
-        # # out = layers.Activation("softmax")(out)
-        # out = layers.Activation(out_activation)(out)
 
         self.net["receiver"].model_train = Model([*inputs, sym_input, reward], train_out)
-        # self.net["receiver"].model_train = Model([*inputs, sym_input, reward], out)
         self.net["receiver"].model_train.compile(loss=custom_loss, optimizer=optimizer(lr=learning_rate))
         self.net["receiver"].model_predict = Model([*inputs, sym_input], out)
         self.net["receiver"].input_shapes = input_shapes

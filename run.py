@@ -17,7 +17,7 @@ from utils.dataprep import load_emb_gz, make_categories
 SETTINGS_FILE = "settings.yaml"
 
 
-def run_training(model_dir, load_file, save_file, dataset, use_categories,
+def run_training(model_dir, load_file, save_file, dataset, use_categories, model_type,
                  vocabulary_size, n_active_images, trim_dataset_to_n_images=False, **experiment_args):
     save_file = save_file.format(TIMESTAMP=TIMESTAMP)
     print(f"Loading image embeddings from '{dataset}' ...")
@@ -50,9 +50,14 @@ def run_training(model_dir, load_file, save_file, dataset, use_categories,
             agent_args[k] = experiment_args[k]
 
     filename = os.path.join(model_dir, save_file)
+    agent_args["model_type"] = model_type
 
-    agent1 = q_agent.MultiAgent(name="01", role="sender", **agent_args)
-    agent2 = q_agent.MultiAgent(name="02", role="receiver", **agent_args)
+    if model_type == "reinforce":
+        agent1 = q_agent.MultiAgentReinforce(name="01", role="sender", **agent_args)
+        agent2 = q_agent.MultiAgentReinforce(name="02", role="receiver", **agent_args)
+    else:
+        agent1 = q_agent.MultiAgent(name="01", role="sender", **agent_args)
+        agent2 = q_agent.MultiAgent(name="02", role="receiver", **agent_args)
 
     if load_file:
         print(f"Loading weights from '{filename}' ...")
@@ -74,7 +79,7 @@ def run_training(model_dir, load_file, save_file, dataset, use_categories,
     return results
 
 
-def run_test(model_dir, load_file, save_file, dataset, use_categories,
+def run_test(model_dir, load_file, save_file, dataset, use_categories, model_type,
              vocabulary_size, n_active_images, trim_dataset_to_n_images=False, **experiment_args):
     save_file = save_file.format(TIMESTAMP=TIMESTAMP)
     print(f"Loading image embeddings from '{dataset}' ...")
@@ -106,9 +111,14 @@ def run_test(model_dir, load_file, save_file, dataset, use_categories,
             agent_args[k] = experiment_args[k]
 
     agent_args["explore"] = None
+    agent_args["model_type"] = model_type
 
-    agent1 = q_agent.MultiAgent(name="01", role="sender", **agent_args)
-    agent2 = q_agent.MultiAgent(name="02", role="receiver", **agent_args)
+    if model_type == "reinforce":
+        agent1 = q_agent.MultiAgentReinforce(name="01", role="sender", **agent_args)
+        agent2 = q_agent.MultiAgentReinforce(name="02", role="receiver", **agent_args)
+    else:
+        agent1 = q_agent.MultiAgent(name="01", role="sender", **agent_args)
+        agent2 = q_agent.MultiAgent(name="02", role="receiver", **agent_args)
 
     if load_file:
         load_filename = os.path.join(model_dir, load_file)

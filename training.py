@@ -7,7 +7,7 @@ from utils.plot import plot_colourline
 
 SHOW_BATCHES = 200
 AVG_WINDOW = 20
-EARLY_STOPPING_BATCHES = 100
+EARLY_STOPPING_BATCHES = 200
 
 
 def equivalent_error_rate(q1, err, q2, n=500):
