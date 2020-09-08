@@ -18,7 +18,7 @@ roles: fixed
 n_episodes: 15000
 
 # Training batch size, also the number of episodes between updates
-batch_size: 20
+batch_size: 30
 
 # Path to embedding file
 #dataset: data/imagenet-4000-vgg19.emb.gz
@@ -53,8 +53,8 @@ explore: none
 gibbs_temperature: 0
 
 # Sender type: agnostic or informed
-sender_type: agnostic
-#sender_type: informed
+#sender_type: agnostic
+sender_type: informed
 
 # Number of CNN filters used by the informed sender
 n_informed_filters: 20
@@ -69,8 +69,8 @@ loss: binary_crossentropy
 # Batch preparation mode
 # - last: only the newest memory entries are selected into the batch
 # - sample: the whole memory is sampled, using the probability distribution below
-#batch_mode: last
-batch_mode: sample
+batch_mode: last
+#batch_mode: sample
 
 # Probability distributions for batch sampling
 # - uniform: all memory entries are given the same probability
@@ -91,14 +91,19 @@ shared_embedding: False
 #shared_embedding: True
 
 # Activation function applied to the network output
-out_activation: sigmoid
-#out_activation: softmax  # DEFAULT
+#out_activation: sigmoid
+out_activation: softmax  # DEFAULT
 
 # Interrupt training early if accuracy goal (significance level) is passed
 # The goal is specified in `training.py`
-stop_when_goal_is_passed: True
+stop_when_goal_is_passed: False
 
 # Model type: "old" is the standard model, other options are breaking/in-development
-#model_type: old
+model_type: old
 #model_type: new
-model_type: reinforce
+#model_type: reinforce
+
+# Save training curves in a csv dataframe
+save_learning_curves: True
+
+early_stopping: False

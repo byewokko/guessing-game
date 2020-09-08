@@ -16,10 +16,11 @@ def equivalent_error_rate(q1, err, q2, n=500):
 
 
 def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_active_images,
-                 roles="switch", show_plot=True, explore="gibbs", gibbs_temperature=0.01,
+                 roles="switch", show_plot=True, explore="gibbs", gibbs_temperature=0.01, early_stopping=False,
                  memory_sampling_distribution="linear", shared_experience=False, stop_when_goal_is_passed=False,
                  **kwargs):
     result_dict = {"goal1_reached": None, "goal2_reached": None}
+    learning_curves = []
     if show_plot:
         fig = plt.figure(figsize=(8, 8))
         plt.subplots_adjust(hspace=0.65)
@@ -105,16 +106,17 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
             else:
                 success_rate_avg.append(sum(success_rate[-AVG_WINDOW:]) / AVG_WINDOW)
                 success_rate_variance.append(
-                    sum([(x - success_rate_avg[-1])**2 for x in success_rate[-AVG_WINDOW:]]) / AVG_WINDOW)
-                if success_rate_avg[-1] > early_stopping_max:
-                    print("early stopping counter reset")
-                    early_stopping_max = success_rate_avg[-1]
-                    early_stopping_counter = EARLY_STOPPING_BATCHES
-                else:
-                    early_stopping_counter -= 1
-                    if early_stopping_counter < 0:
-                        print("EARLY STOPPING")
-                        break
+                    sum([(x - success_rate_avg[-1]) ** 2 for x in success_rate[-AVG_WINDOW:]]) / AVG_WINDOW)
+                if early_stopping:
+                    if success_rate_avg[-1] > early_stopping_max:
+                        print("early stopping counter reset")
+                        early_stopping_max = success_rate_avg[-1]
+                        early_stopping_counter = EARLY_STOPPING_BATCHES
+                    else:
+                        early_stopping_counter -= 1
+                        if early_stopping_counter < 0:
+                            print("EARLY STOPPING")
+                            break
 
             sendr1_loss.append(agent1.net["sender"].last_loss)
             sendr2_loss.append(agent2.net["sender"].last_loss)
@@ -122,7 +124,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
             recvr2_loss.append(agent2.net["receiver"].last_loss)
             if not episode % 50:
                 print(f"Episode {episode}")
-                print(f"Batch success rate {success_rate_avg[-1]}, std {success_rate_variance[-1]**(1/2)}")
+                print(f"Batch success rate {success_rate_avg[-1]}, std {success_rate_variance[-1] ** (1 / 2)}")
             if not show_plot:
                 continue
             ax1.clear()
@@ -144,7 +146,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
             plot_colourline(t[-SHOW_BATCHES:], success_rate_avg[-SHOW_BATCHES:],
                             success_rate_variance[-SHOW_BATCHES:], ax3)
             n_symbols = len(symbol_probabilities[0])
-            histogram = ax4.hist(sender_symbols, range(n_symbols+1), align="mid")
+            histogram = ax4.hist(sender_symbols, range(n_symbols + 1), align="mid")
             probs_mean = np.mean(symbol_probabilities, axis=0)
             probs_std = np.std(symbol_probabilities, axis=0)
             ax5.hlines(probs_mean, range(n_symbols), range(1, n_symbols + 1),
@@ -165,6 +167,15 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
             result_dict["symbol_histogram_median"] = np.median(histogram[0])
             result_dict["symbol_histogram_std"] = np.std(histogram[0])
 
+            learning_curves.append({
+                "episode": episode,
+                "batch_success": success_rate[-1],
+                "agent1_sender_loss": sendr1_loss[-1],
+                "agent2_sender_loss": sendr2_loss[-1],
+                "agent1_receiver_loss": recvr1_loss[-1],
+                "agent2_receiver_loss": recvr2_loss[-1]
+            })
+
             if success_rate_avg[-1] >= goal1 and not goal1_reached:
                 goal1_reached = True
                 result_dict["goal1_reached"] = episode
@@ -178,7 +189,8 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
                     break
 
     print("Training finished")
-    return result_dict
+    learning_curves = pd.DataFrame(learning_curves)
+    return result_dict, learning_curves
 
 
 def run_test(game, agent1, agent2, res_file, n_episodes, batch_size, n_active_images,
@@ -213,7 +225,7 @@ def run_test(game, agent1, agent2, res_file, n_episodes, batch_size, n_active_im
     sender = agent1
     receiver = agent2
 
-    for episode in range(1, n_episodes+1):
+    for episode in range(1, n_episodes + 1):
         # results["episode"] = i
         results["sender_name"] = sender.get_active_name()
         results["receiver_name"] = receiver.get_active_name()
