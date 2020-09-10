@@ -17,8 +17,9 @@ from utils.dataprep import load_emb_gz, make_categories
 SETTINGS_FILE = "settings.yaml"
 
 
-def run_training(model_dir, load_file, save_file, dataset, use_categories, model_type,
-                 vocabulary_size, n_active_images, trim_dataset_to_n_images=False, **experiment_args):
+def run_training(model_dir, load_file, save_file, dataset, use_categories,
+                 vocabulary_size, n_active_images,  model_type="old", trim_dataset_to_n_images=False,
+                 **experiment_args):
     save_file = save_file.format(TIMESTAMP=TIMESTAMP)
     print(f"Loading image embeddings from '{dataset}' ...")
     path2ind, path_list, embeddings = load_emb_gz(dataset, trim_dataset_to_n_images)
