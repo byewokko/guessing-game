@@ -4,6 +4,7 @@ from keras.models import Model
 import keras.layers as layers
 import keras.optimizers as optim
 import keras.backend as K
+# import tensorflow.nn as N
 
 from agent import component
 
@@ -80,8 +81,6 @@ class MultiAgent(Agent):
             self._build_model(**kwargs)
         elif model_type == "new":
             self._build_model_alt(**kwargs)
-        elif model_type == "reinforce":
-            self._build_model_reinforce(**kwargs)
         else:
             raise KeyError(f"model_type: '{model_type}")
 
@@ -453,21 +452,6 @@ class MultiAgentReinforce(Agent):
         print("-!- Using REINFORCE model -!-")
         print("Following user settings will be ignored:")
         print("out_activation, sender_type, optimizer, dropout, shared_embedding")
-        # Shared part
-        n_input_images = len(input_shapes) - 1
-        inputs = [layers.Input(shape=input_shapes[i],
-                               name=f"input_{i}")
-                  for i in range(n_input_images)]
-        embs = [layers.Dense(embedding_size,
-                             activation='linear',
-                             name=f"embed_{i}")
-                for i in range(n_input_images)]
-        emb = layers.Dense(embedding_size,
-                           activation='linear',
-                           name=f"embed_img")
-
-        imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
-        # imgs = [emb(inputs[i]) for i in range(n_input_images)]  # same embedding layer for all images
 
         # optimizer = "SGD"
         if isinstance(optimizer, str):
@@ -478,33 +462,31 @@ class MultiAgentReinforce(Agent):
             else:
                 raise TypeError(f"Unknown optimizer '{optimizer}'")
 
+        # Shared part
+        n_input_images = len(input_shapes) - 1
+        inputs = [layers.Input(shape=input_shapes[i],
+                               name=f"input_{i}")
+                  for i in range(n_input_images)]
+        emb = layers.Dense(embedding_size,
+                           activation='linear',
+                           name=f"embed_img")
+
+        imgs = [emb(inputs[i]) for i in range(n_input_images)]
+
         out = [layers.Activation("sigmoid")(imgs[i]) for i in range(n_input_images)]
         concat = layers.concatenate(out, axis=-1)
         out = layers.Dense(n_symbols)(concat)
 
-        out = layers.Activation("sigmoid")(out)
-        train_out = out
-
-        # Common sender part
-        # if self.gibbs_temperature != 0:
-        #     out = layers.Lambda(lambda x: x / self.gibbs_temperature)(out)
-        # # out = layers.Activation("softmax")(out)
-        # out = layers.Activation(out_activation)(out)
-
         reward = layers.Input((1,), name="reward")
 
         def custom_loss(y_true, y_pred):
+            # negative_likelihoods = N.softmax_cross_entropy_with_logits(labels=actions, logits=predictions)
+            # loss = K.mean(negative_likelihoods)
             log_lik = -y_true * K.log(y_pred) + (1 - y_true) * K.log(1 - y_pred)
-            return K.mean(log_lik, axis=1)
-            # return layers.Lambda(lambda x: K.sqrt(K.sum(K.square(x))))(log_lik)  # Cartesian sum doesn't work
-            # y_pred = layers.Activation("softplus")(y_pred)
-            # FIXME: NaN PROBLEM, log receives non-positive input, produces NaN loss value
-            # return K.sum(K.log(y_pred) * y_true) * reward
-            # log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
-            # return K.mean(log_lik * reward, axis=1, keepdims=True)
+            return K.mean(log_lik, axis=1) * reward
 
         self.net["sender"].model_predict = Model(inputs, out)
-        self.net["sender"].model_train = Model([*inputs, reward], train_out)
+        self.net["sender"].model_train = Model([*inputs, reward], out)
         # self.net["sender"].model_train = Model([*inputs, reward], out)
         self.net["sender"].model_train.compile(loss=custom_loss, optimizer=optimizer(lr=learning_rate))
         self.net["sender"].input_shapes = input_shapes[:-1]
@@ -512,7 +494,9 @@ class MultiAgentReinforce(Agent):
         self.net["sender"].reset_batch()
         self.net["sender"].reset_memory()
 
+        ###############
         # Receiver part
+
         symbol_shape = input_shapes[-1]
         sym_input = layers.Input(shape=symbol_shape, dtype="int32", name="input_sym")
         emb_sym = layers.Embedding(input_dim=n_symbols,
@@ -522,16 +506,10 @@ class MultiAgentReinforce(Agent):
 
         shared_embedding = False
         if not shared_embedding:
-            embs = [layers.Dense(embedding_size,
-                                 activation='linear',
-                                 name=f"embed_{i}")
-                    for i in range(n_input_images)]
             emb = layers.Dense(embedding_size,
                                activation='linear',
                                name=f"embed_img")
-
-            imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
-            # imgs = [emb(inputs[i]) for i in range(n_input_images)]  # same embedding layer for all images
+            imgs = [emb(inputs[i]) for i in range(n_input_images)]  # same embedding layer for all images
 
         rcv_mode = "dot_product"
         # rcv_mode = "euclidean_distance"
@@ -542,20 +520,18 @@ class MultiAgentReinforce(Agent):
             dot_prods = [dot([img, symbol]) for img in imgs]
             out = layers.concatenate(dot_prods, axis=-1)
             # squeeze the output within (0, 1)
-            out = layers.Activation("sigmoid")(out)
+            # out = layers.Activation("sigmoid")(out)
         elif rcv_mode == "euclidean_distance":
             out = [layers.Subtract()([img, symbol]) for img in imgs]
             out = layers.Lambda(lambda x: K.sqrt(K.sum(K.square(x))))(out)
             # squeeze the output within (0, 1)
-            out = layers.Activation("sigmoid")(-1 * out)
+            # out = layers.Activation("sigmoid")(-1 * out)
         elif rcv_mode == "cosine_similarity":
             raise NotImplementedError(f"rcv_mode: '{rcv_mode}'")
         else:
             raise KeyError(f"rcv_mode: '{rcv_mode}'")
 
-        train_out = out
-
-        self.net["receiver"].model_train = Model([*inputs, sym_input, reward], train_out)
+        self.net["receiver"].model_train = Model([*inputs, sym_input, reward], out)
         self.net["receiver"].model_train.compile(loss=custom_loss, optimizer=optimizer(lr=learning_rate))
         self.net["receiver"].model_predict = Model([*inputs, sym_input], out)
         self.net["receiver"].input_shapes = input_shapes
