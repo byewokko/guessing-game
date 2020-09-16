@@ -1,3 +1,9 @@
+## New Imagenet dataset
+
+`mcrae-484x100-vgg19.emb.gz`
+
+484 categories based on concepts from McRae et al. (2005)
+
 ## ImageNet dataset
 
 `imagenet-200x65-vgg19.train.emb.gz`

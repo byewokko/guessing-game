@@ -21,8 +21,8 @@ n_episodes: 15000
 batch_size: 30
 
 # Path to embedding file
-#dataset: data/imagenet-4000-vgg19.emb.gz
-dataset: data/imagenet-200x65-vgg19.train.emb.gz
+dataset: data/mcrae-459x100-vgg19.emb.gz
+#dataset: data/imagenet-200x65-vgg19.train.emb.gz
 #dataset: data/imagenet-200x15-vgg19.test-img.emb.gz
 #dataset: data/imagenet-27x80-vgg19.test-ctg.emb.gz
 #dataset: data/esp-10000-vgg19.emb.gz
@@ -53,8 +53,8 @@ explore: none
 gibbs_temperature: 0
 
 # Sender type: agnostic or informed
-#sender_type: agnostic
-sender_type: informed
+sender_type: agnostic
+#sender_type: informed
 
 # Number of CNN filters used by the informed sender
 n_informed_filters: 20
@@ -99,11 +99,11 @@ out_activation: softmax  # DEFAULT
 stop_when_goal_is_passed: False
 
 # Model type: "old" is the standard model, other options are breaking/in-development
-model_type: old
+#model_type: old
 #model_type: new
-#model_type: reinforce
+model_type: reinforce
 
 # Save training curves in a csv dataframe
-save_learning_curves: True
+save_learning_curves: False
 
 early_stopping: False

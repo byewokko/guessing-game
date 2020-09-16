@@ -392,6 +392,7 @@ class MultiAgentReinforce(Agent):
         super().__init__(**kwargs)
         self.net = {"sender": component.Net(),
                     "receiver": component.Net()}
+        self._build_model(**kwargs)
 
     def active_net(self):
         assert self.role in self.net.keys()
@@ -401,13 +402,10 @@ class MultiAgentReinforce(Agent):
         state = [np.expand_dims(st, 0) for st in state]
         act_values = self.active_net().predict(state)
         act_values = np.squeeze(act_values)
-        if explore == "gibbs":
-            if np.any(np.isnan(act_values)):
-                print(act_values)
-            probs = softmax(act_values, self.gibbs_temperature)
-            action = np.random.choice(range(len(act_values)), 1, p=probs)
-        else:
-            action = np.argmax(act_values)
+        if np.any(np.isnan(act_values)):
+            print(act_values)
+        probs = act_values
+        action = np.random.choice(range(len(act_values)), 1, p=probs)
         # self.last_action = (state, action, act_values)
         return action, act_values
 
@@ -453,14 +451,10 @@ class MultiAgentReinforce(Agent):
         print("Following user settings will be ignored:")
         print("out_activation, sender_type, optimizer, dropout, shared_embedding")
 
-        # optimizer = "SGD"
-        if isinstance(optimizer, str):
-            if optimizer.lower() == "adam":
-                optimizer = optim.Adam
-            elif optimizer.lower() == "sgd":
-                optimizer = optim.SGD
-            else:
-                raise TypeError(f"Unknown optimizer '{optimizer}'")
+        # optimizer = optim.Adam
+        optimizer = optim.SGD
+        temperature = 10
+        learning_rate = 0.5
 
         # Shared part
         n_input_images = len(input_shapes) - 1
@@ -477,13 +471,15 @@ class MultiAgentReinforce(Agent):
         concat = layers.concatenate(out, axis=-1)
         out = layers.Dense(n_symbols)(concat)
 
+        temp = layers.Lambda(lambda x: x / temperature)
+        soft = layers.Softmax()
+
+        out = soft(temp(out))
+
         reward = layers.Input((1,), name="reward")
 
         def custom_loss(y_true, y_pred):
-            # negative_likelihoods = N.softmax_cross_entropy_with_logits(labels=actions, logits=predictions)
-            # loss = K.mean(negative_likelihoods)
-            log_lik = -y_true * K.log(y_pred) + (1 - y_true) * K.log(1 - y_pred)
-            return K.mean(log_lik, axis=1) * reward
+            return - K.mean(K.log(y_pred) * y_true, axis=1) * reward
 
         self.net["sender"].model_predict = Model(inputs, out)
         self.net["sender"].model_train = Model([*inputs, reward], out)
@@ -530,6 +526,11 @@ class MultiAgentReinforce(Agent):
             raise NotImplementedError(f"rcv_mode: '{rcv_mode}'")
         else:
             raise KeyError(f"rcv_mode: '{rcv_mode}'")
+
+        temp = layers.Lambda(lambda x: x/temperature)
+        soft = layers.Softmax()
+
+        out = soft(temp(out))
 
         self.net["receiver"].model_train = Model([*inputs, sym_input, reward], out)
         self.net["receiver"].model_train.compile(loss=custom_loss, optimizer=optimizer(lr=learning_rate))

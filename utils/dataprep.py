@@ -16,7 +16,7 @@ def save_emb(keys, values, filename, number_format=".6f"):
     out.close()
 
 
-def save_emb_gz(keys, values, filename, number_format=".6f"):
+def save_emb_gz(keys, values, filename, number_format=".4e"):
     assert len(keys) == len(values)
     number_format = f"{{n:{number_format}}}"
     out = gzip.open(filename, "wb")
