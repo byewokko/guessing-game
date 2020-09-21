@@ -6,7 +6,7 @@ from datetime import datetime
 import run
 
 
-QUEUE_FILE = "queue6.csv"
+QUEUE_FILE = "results/queue6.csv"
 RESULTS_FILE = "results/results6.csv"
 
 

@@ -411,9 +411,9 @@ class MultiAgentReinforce(Agent):
 
     def remember(self, state, action, reward, net=None):
         if not net:
-            self.active_net().remember(state, action, reward)
+            self.active_net().remember(state, action, reward, action_mode="index")
         else:
-            self.net[net].remember(state, action, reward)
+            self.net[net].remember(state, action, reward, action_mode="index")
 
     def prepare_batch(self, size: int, **kwargs):
         self.active_net().prepare_batch(size, **kwargs)
@@ -449,12 +449,12 @@ class MultiAgentReinforce(Agent):
                                sender_type="agnostic", shared_embedding=True, **kwargs):
         print("-!- Using REINFORCE model -!-")
         print("Following user settings will be ignored:")
-        print("out_activation, sender_type, optimizer, dropout, shared_embedding")
+        print("loss, out_activation, sender_type, optimizer, dropout, shared_embedding")
 
-        # optimizer = optim.Adam
-        optimizer = optim.SGD
+        optimizer = optim.Adam
+        # optimizer = optim.SGD
         temperature = 10
-        learning_rate = 0.5
+        # learning_rate = 0.01
 
         # Shared part
         n_input_images = len(input_shapes) - 1
@@ -474,17 +474,19 @@ class MultiAgentReinforce(Agent):
         temp = layers.Lambda(lambda x: x / temperature)
         soft = layers.Softmax()
 
-        out = soft(temp(out))
+        action_probs = soft(temp(out))
 
-        reward = layers.Input((1,), name="reward")
+        action_index = layers.Input((1,), dtype="int32", name="reward")
+        selected_action_prob = layers.Lambda(
+            lambda probs_indices: K.gather(*probs_indices)
+        )([action_probs, action_index])
 
-        def custom_loss(y_true, y_pred):
-            return - K.mean(K.log(y_pred) * y_true, axis=1) * reward
+        def reinforce_loss(target, prediction):
+            return - K.log(prediction) * target
 
-        self.net["sender"].model_predict = Model(inputs, out)
-        self.net["sender"].model_train = Model([*inputs, reward], out)
-        # self.net["sender"].model_train = Model([*inputs, reward], out)
-        self.net["sender"].model_train.compile(loss=custom_loss, optimizer=optimizer(lr=learning_rate))
+        self.net["sender"].model_predict = Model(inputs, action_probs)
+        self.net["sender"].model_train = Model([*inputs, action_index], selected_action_prob)
+        self.net["sender"].model_train.compile(loss=reinforce_loss, optimizer=optimizer(lr=learning_rate))
         self.net["sender"].input_shapes = input_shapes[:-1]
         self.net["sender"].output_size = n_symbols
         self.net["sender"].reset_batch()
@@ -530,11 +532,16 @@ class MultiAgentReinforce(Agent):
         temp = layers.Lambda(lambda x: x/temperature)
         soft = layers.Softmax()
 
-        out = soft(temp(out))
+        action_probs = soft(temp(out))
 
-        self.net["receiver"].model_train = Model([*inputs, sym_input, reward], out)
-        self.net["receiver"].model_train.compile(loss=custom_loss, optimizer=optimizer(lr=learning_rate))
-        self.net["receiver"].model_predict = Model([*inputs, sym_input], out)
+        action_index = layers.Input((1,), dtype="int32", name="action_index")
+        selected_action_prob = layers.Lambda(
+            lambda probs_indices: K.gather(*probs_indices)
+        )([action_probs, action_index])
+
+        self.net["receiver"].model_predict = Model([*inputs, sym_input], action_probs)
+        self.net["receiver"].model_train = Model([*inputs, sym_input, action_index], selected_action_prob)
+        self.net["receiver"].model_train.compile(loss=reinforce_loss, optimizer=optimizer(lr=learning_rate))
         self.net["receiver"].input_shapes = input_shapes
         self.net["receiver"].output_size = n_input_images
         self.net["receiver"].reset_batch()

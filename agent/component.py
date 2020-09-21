@@ -56,12 +56,17 @@ class Net:
         self.reset_batch()
         return self.last_loss
 
-    def remember(self, state, action, reward):
+    def remember(self, state, action, reward, action_mode="onehot"):
         for i in range(len(state)):
             self.memory_states[i].append(state[i])
-        action_onehot = np.zeros([self.output_size])
-        action_onehot[action] = 1
-        self.memory_actions.append(action_onehot)
+        if action_mode == "onehot":
+            action_onehot = np.zeros([self.output_size])
+            action_onehot[action] = 1
+            self.memory_actions.append(action_onehot)
+        elif action_mode == "index":
+            self.memory_actions.append(action)
+        else:
+            raise NotImplementedError(f"action_mode: '{action_mode}'")
         self.memory_rewards.append(reward)
 
     def trim_memory(self, length=None):
