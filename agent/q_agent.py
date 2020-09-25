@@ -4,7 +4,7 @@ from keras.models import Model
 import keras.layers as layers
 import keras.optimizers as optim
 import keras.backend as K
-# import tensorflow.nn as N
+import tensorflow as tf
 
 from agent import component
 
@@ -435,8 +435,14 @@ class MultiAgentReinforce(Agent):
         if not name:
             time = dt.now().strftime("%y%m%d-%H%M")
             name = f"model-{time}"
-        self.net["sender"].model.save_weights(f"{name}.snd")
-        self.net["receiver"].model.save_weights(f"{name}.rcv")
+        if self.net["sender"].model:
+            self.net["sender"].model.save_weights(f"{name}.snd")
+        else:
+            self.net["sender"].model_train.save_weights(f"{name}.snd")
+        if self.net["receiver"].model:
+            self.net["receiver"].model.save_weights(f"{name}.rcv")
+        else:
+            self.net["receiver"].model_train.save_weights(f"{name}.rcv")
 
     def get_embedding(self, image_vector):
         return self.active_net().embed(image_vector)
@@ -453,7 +459,7 @@ class MultiAgentReinforce(Agent):
 
         optimizer = optim.Adam
         # optimizer = optim.SGD
-        temperature = 10
+        temperature = 0.1
         # learning_rate = 0.01
 
         # Shared part
@@ -478,8 +484,9 @@ class MultiAgentReinforce(Agent):
 
         action_index = layers.Input((1,), dtype="int32", name="reward")
         selected_action_prob = layers.Lambda(
-            lambda probs_indices: K.gather(*probs_indices)
+            lambda probs_indices: tf.gather_nd(*probs_indices)
         )([action_probs, action_index])
+        # selected_action_prob = layers.Flatten()(selected_action_prob)
 
         def reinforce_loss(target, prediction):
             return - K.log(prediction) * target
@@ -487,6 +494,7 @@ class MultiAgentReinforce(Agent):
         self.net["sender"].model_predict = Model(inputs, action_probs)
         self.net["sender"].model_train = Model([*inputs, action_index], selected_action_prob)
         self.net["sender"].model_train.compile(loss=reinforce_loss, optimizer=optimizer(lr=learning_rate))
+        self.net["sender"].model_train.summary()
         self.net["sender"].input_shapes = input_shapes[:-1]
         self.net["sender"].output_size = n_symbols
         self.net["sender"].reset_batch()
@@ -520,8 +528,11 @@ class MultiAgentReinforce(Agent):
             # squeeze the output within (0, 1)
             # out = layers.Activation("sigmoid")(out)
         elif rcv_mode == "euclidean_distance":
-            out = [layers.Subtract()([img, symbol]) for img in imgs]
-            out = layers.Lambda(lambda x: K.sqrt(K.sum(K.square(x))))(out)
+            sub = layers.Subtract()
+            dist = layers.Lambda(lambda x: K.sqrt(K.sum(K.square(x), axis=1, keepdims=True)))
+            out = [sub([img, symbol]) for img in imgs]
+            out = [dist(img) for img in out]
+            out = layers.concatenate(out, axis=-1)
             # squeeze the output within (0, 1)
             # out = layers.Activation("sigmoid")(-1 * out)
         elif rcv_mode == "cosine_similarity":
@@ -536,12 +547,14 @@ class MultiAgentReinforce(Agent):
 
         action_index = layers.Input((1,), dtype="int32", name="action_index")
         selected_action_prob = layers.Lambda(
-            lambda probs_indices: K.gather(*probs_indices)
+            lambda probs_indices: tf.gather_nd(*probs_indices)
         )([action_probs, action_index])
+        # selected_action_prob = layers.Reshape((1,))(selected_action_prob)
 
         self.net["receiver"].model_predict = Model([*inputs, sym_input], action_probs)
         self.net["receiver"].model_train = Model([*inputs, sym_input, action_index], selected_action_prob)
         self.net["receiver"].model_train.compile(loss=reinforce_loss, optimizer=optimizer(lr=learning_rate))
+        self.net["receiver"].model_train.summary()
         self.net["receiver"].input_shapes = input_shapes
         self.net["receiver"].output_size = n_input_images
         self.net["receiver"].reset_batch()

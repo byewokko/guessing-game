@@ -67,6 +67,10 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
         receiver_state = game.get_receiver_state(sender_action)
         receiver_action, _ = receiver.act(receiver_state, explore=explore, gibbs_temperature=gibbs_temperature)
         sender_reward, receiver_reward, success = game.evaluate_guess(receiver_action)
+        # if sender_action == 0:  # dummy sender task
+        #     sender_reward, receiver_reward, success = (1, 1, 1)
+        # else:
+        #     sender_reward, receiver_reward, success = (0, 0, 0)
 
         sender.remember(sender_state, sender_action, sender_reward)
         receiver.remember(receiver_state, receiver_action, receiver_reward)
