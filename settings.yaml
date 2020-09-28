@@ -101,7 +101,8 @@ stop_when_goal_is_passed: False
 # Model type: "old" is the standard model, other options are breaking/in-development
 #model_type: old
 #model_type: new
-model_type: reinforce
+#model_type: reinforce
+model_type: reinforce_new
 
 # Save training curves in a csv dataframe
 save_learning_curves: False

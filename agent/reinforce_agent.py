@@ -1,323 +1,274 @@
+import typing
+
 import numpy as np
-from keras.models import Model
-import keras.layers as layers
-import keras.optimizers as optim
-import keras.backend as K
-import keras.initializers as init
-from keras.losses import categorical_crossentropy
-from keras.regularizers import l2
+import tensorflow as tf
+import tensorflow.keras.models as models
+import tensorflow.keras.layers as layers
+import tensorflow.keras.optimizers as optim
+import tensorflow.keras.backend as K
 
-from utils.debug import print_layer
+import sys
+sys.path.append("..")
+
+from utils.debug import get_shape
+from utils.utils import dict_default
+
+N_IMAGES = 2
+EMBEDDING_SIZE = 50
+VOCABULARY_SIZE = 100
+TEMPERATURE = 10
+SENDER_TYPE = "agnostic"
+LEARNING_RATE = 0.1
+OPTIMIZER = "adam"
+SHARED_EMBEDDING = False
+ADAPTIVE_TEMPERATURE = False
+
+optimizer_dict = {
+    "adam": optim.Adam,
+    "sgd": optim.SGD
+}
 
 
-def cosine_distance(stack):
-    x, y = stack
-    x = K.l2_normalize(x, axis=-1)
-    y = K.l2_normalize(y, axis=-1)
-    return K.dot(x, y)
+def convert_parameter_dict(old_params: dict):
+    new_params = {
+        "n_images": len(old_params["input_shapes"]) - 1,
+        "input_image_shape": old_params["input_shapes"][0],
+        "embedding_size": dict_default(old_params, "embedding_size", EMBEDDING_SIZE),
+        "vocabulary_size": dict_default(old_params, "n_symbols", VOCABULARY_SIZE),
+        "sender_type": dict_default(old_params, "sender_type", SENDER_TYPE),
+        "temperature": dict_default(old_params, "gibbs_temperature", TEMPERATURE),
+        "shared_embedding": dict_default(old_params, "shared_embedding", SHARED_EMBEDDING),
+        "learning_rate": dict_default(old_params, "learning_rate", LEARNING_RATE),
+        "adaptive_temperature": dict_default(old_params, "adaptive_temperature", ADAPTIVE_TEMPERATURE),
+        "optimizer": dict_default(old_params,
+                                  "optimizer",
+                                  optimizer_dict[OPTIMIZER],
+                                  lambda x: optimizer_dict[x.lower()])
+    }
+    return new_params
 
 
 class Agent:
-    input_type = "data"
-
-    def __init__(self, input_sizes, output_size, n_symbols,
-                 embedding_size=50, learning_rate=0.001, gibbs_temp=10,
-                 optimizer=optim.Adam, use_bias=True,
+    def __init__(self,
+                 name: str,
+                 role: str,
+                 temperature: float = TEMPERATURE,
                  **kwargs):
-        self.last_updates = None
-        self.n_input_images = 2
-        self.input_sizes = input_sizes
-        self.embedding_size = embedding_size
-        self.output_size = output_size
-        self.n_symbols = n_symbols
-        self.last_action = None
-        self.last_loss = 0
-        self.last_weights = None
-        self.train_model = None
-        self.predict_model = None
-        self.learning_rate = learning_rate
-        self.gibbs_temp = gibbs_temp
-        self.exploration_rate = 1.
-        self.exploration_rate_decay = 0.99
-        self.exploration_min = 0.015
-        self.optimizer = optimizer(self.learning_rate, clipnorm=1.)
-        self.use_bias = use_bias
-        self.batch_states = None
-        self.batch_actions = None
-        self.batch_rewards = None
-        self.reset_batch()
+        self.name: str = name
+        self.role: str = role
+        self.model: typing.Optional[models.Model] = None
+        self.model_train: typing.Optional[models.Model] = None
+        self.memory_x: list = []
+        self.memory_y: list = []
+        self.temperature: float = temperature
+        self.last_loss: typing.Optional[float] = None
 
-    def _build_model(self, **kwargs):
+    def _build_model(self, *args, **kwargs):
         raise NotImplementedError
 
-    def act(self, state, explore=True):
-        state = [np.expand_dims(st, 0) for st in state]
-        act_probs = self.predict_model.predict(state)
-        # act_probs = self.train_model.predict([*state, np.asarray([0])])
-        act_probs = np.squeeze(act_probs)
-        # TODO: fix the sampling, this is stupid
-        if explore and np.random.rand() > self.exploration_rate:
-            if self.exploration_rate > self.exploration_min:
-                self.exploration_rate *= self.exploration_rate_decay
-            # Sample from Gibbs distribution
-            act_probs_exp = np.exp(act_probs / self.gibbs_temp)
-            act_probs = act_probs_exp / act_probs_exp.sum()
-            # action = np.random.choice(range(self.output_size), 1, p=act_probs)
-        else:
-            action = np.argmax(act_probs)
-        self.last_action = (state, action, act_probs)
-        return action, act_probs
-
-    def fit(self, state, action, reward):
-        self.last_weights = self.train_model.get_weights()
-        action_onehot = np.zeros([self.output_size])
-        action_onehot[action] = 1
-        X = [np.expand_dims(st, 0) for st in state]
-        Y = np.expand_dims(action_onehot, 0)
-        self.last_loss = self.train_model.train_on_batch([*X, reward], Y)
-        # self.last_updates = self.optimizer.get_updates() # needs args: loss and params
-
-    def remember(self, state, action, reward):
-        for i in range(len(state)):
-            self.batch_states[i].append(state[i])
-        action_onehot = np.zeros([self.output_size])
-        action_onehot[action] = 1
-        self.batch_actions.append(action_onehot)
-        self.batch_rewards.append(reward)
+    def act(self, state: list, **kwargs):
+        probs = np.squeeze(self.predict(state))
+        action = np.random.choice(np.arange(len(probs)), p=probs)
+        return action, probs
 
     def batch_train(self):
-        self.last_loss = self.train_model.train_on_batch(
-            [np.stack(stack) for stack in [*self.batch_states, self.batch_rewards]],
-            np.stack(self.batch_actions)
-        )
-        self.reset_batch()
+        self.update_on_batch(reset_after=True)
 
     def reset_batch(self):
-        self.batch_states = [[] for _ in self.input_sizes]
-        self.batch_actions = []
-        self.batch_rewards = []
+        self.reset_memory()
 
-    def load(self, name):
-        self.train_model.load_weights(name)
+    def prepare_batch(self, *args, **kwargs):
+        pass
 
-    def save(self, name):
-        self.train_model.save_weights(name)
+    def load(self, name: str):
+        self.model.load_weights(name)
+
+    def save(self, name: str):
+        self.model.save_weights(name)
+
+    def predict(self, state: list, temperature: typing.Optional[float] = None):
+        if temperature:
+            assert temperature > 0
+        else:
+            temperature = self.temperature
+        x = [np.expand_dims(s, axis=0) for s in state]
+        x.append(np.asarray([temperature]))
+        # print(get_shape(x))
+        return self.model.predict_on_batch(x)
+
+    def update(self, state: list, action: np.array, target: np.array, temperature: typing.Optional[float] = None):
+        if temperature:
+            assert temperature > 0
+        else:
+            temperature = self.temperature
+        x = [np.expand_dims(s, axis=0) for s in state]
+        x.append(np.asarray([action]))
+        x.append(np.asarray([self.temperature]))
+        # print(get_shape(x), get_shape(target))
+        loss = self.model_train.train_on_batch(x=x, y=target)
+        self.last_loss = loss
+        return loss
+
+    def remember(self, state: list, action: np.array, target: np.array):
+        x = [np.expand_dims(s, axis=0) for s in state]
+        x.append(np.asarray([action]))
+        self.memory_x.append(x)
+        self.memory_y.append(np.asarray([target]))
+
+    def reset_memory(self):
+        self.memory_x = []
+        self.memory_y = []
+
+    def update_on_batch(self, reset_after: bool = True, temperature: typing.Optional[float] = None):
+        if temperature:
+            assert temperature > 0
+        else:
+            temperature = self.temperature
+        loss = []
+        for x, y in zip(self.memory_x, self.memory_y):
+            x = [*x, np.array([self.temperature])]
+            loss.append(self.model_train.train_on_batch(x=x, y=y))
+        if reset_after:
+            self.reset_memory()
+        self.last_loss = np.mean(loss)
+        return loss
+
+    def get_last_loss(self, net_name: str = None):
+        if net_name == self.role:
+            return self.last_loss
+        else:
+            return np.NaN
+
+    def set_temperature(self, temperature: float):
+        self.temperature = temperature
+
+    def adjust_temperature(self, loss: float):
+        if loss < 0.001:
+            self.temperature *= 1.1
+        elif loss > 2:
+            self.temperature /= 1.1
 
 
 class Sender(Agent):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self,
+                 name: str,
+                 **kwargs):
+        super(Sender, self).__init__(name=name,
+                                     role="sender")
         self._build_model(**kwargs)
+        self.reset_memory()
 
-    def _build_model(self, **kwargs):
-        n_inputs = len(self.input_sizes)
-        inputs = [layers.Input(shape=self.input_sizes[i],
-                               name=f"input_{i}")
-                  for i in range(n_inputs)]
-        embs = [layers.Dense(self.embedding_size,
-                             activation='sigmoid',
-                             use_bias=self.use_bias,
-                             # kernel_initializer=init.glorot_uniform(seed=42),
-                             # kernel_regularizer=l2(0.001),
-                             name=f"embed_{i}")
-                for i in range(n_inputs)]
+    def _build_model(self, n_images, input_image_shape, embedding_size, vocabulary_size, optimizer,
+                    learning_rate, sender_type="agnostic", verbose=False, **kwargs):
+        image_inputs = [layers.Input(shape=input_image_shape,
+                                     name=f"S_image_in_{i}",
+                                     dtype="float32") for i in range(n_images)]
+        image_embedding_layer = layers.Dense(embedding_size,
+                                             name="S_image_embedding")
+        # agnostic part
+        sigmoid = layers.Activation("sigmoid", name="S_sigmoid")
+        output_layer = layers.Dense(vocabulary_size, name="S_output")
 
-        emb = layers.Dense(self.embedding_size,
-                           activation='sigmoid',
-                           use_bias=self.use_bias,
-                           # kernel_initializer=init.glorot_uniform(seed=42),
-                           # kernel_regularizer=l2(0.001),
-                           name=f"embed_img")
+        # informed part
+        stack = layers.Lambda(lambda x: K.stack(x, axis=1), name="S_stack")
+        permute = layers.Permute([2, 1], name="S_permute")
+        feature_filters = layers.Conv1D(filters=vocabulary_size,
+                                        kernel_size=(1,),
+                                        input_shape=[n_images, embedding_size],
+                                        activation="sigmoid",
+                                        data_format="channels_last",
+                                        name="S_feature_filters")
+        vocabulary_filter = layers.Conv1D(1,
+                                          kernel_size=(1,),
+                                          data_format="channels_last",
+                                          name="S_vocabulary_filter")
+        flatten = layers.Flatten()
 
-        imgs = [embs[i](inputs[i]) for i in range(n_inputs)]  # separate embedding layer for each image
-        # imgs = [emb(inputs[i]) for i in range(n_inputs)]  # same embedding layer for all images
+        temperature_input = layers.Input(shape=[], dtype="float32", name="R_temperature_input")
 
-        concat = layers.concatenate(imgs, axis=-1)
-        out = layers.Dense(self.output_size,
-                           activation='linear',
-                           use_bias=self.use_bias,
-                           # kernel_initializer=init.glorot_uniform(seed=42)
-                           )(concat)
+        softmax = layers.Softmax()
 
-        temp = layers.Lambda(lambda x: x / self.gibbs_temp)
-        soft = layers.Activation("softmax")
-        predict_out = soft(temp(out))
-        train_out = soft(out)
-        # train_out = out
+        y = [image_embedding_layer(x) for x in image_inputs]
+        if sender_type == "agnostic":
+            y = [sigmoid(x) for x in y]
+            y = layers.concatenate(y, axis=-1)
+            y = output_layer(y)
+        elif sender_type == "informed":
+            y = stack(y)
+            y = permute(y)
+            y = feature_filters(y)
+            y = permute(y)
+            y = vocabulary_filter(y)
+            y = flatten(y)
 
-        reward = layers.Input((1,), name="reward")
+        y = y / temperature_input
+        y = softmax(y)
 
-        def custom_loss(y_true, y_pred):
-            # Cross-entropy 1 (??)
-            log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
-            return K.mean(log_lik * reward, keepdims=True)
+        self.model = models.Model([*image_inputs, temperature_input], y, name="S_predict")
 
-            # Cross-entropy 2
-            # return K.sum(K.log(y_pred) * y_true) * reward
+        index = layers.Input(shape=[1], dtype="int32", name="S_index_in")
+        y_selected = layers.Lambda(
+            lambda probs_index: K.gather(probs_index[0][0], probs_index[1]),
+            name="S_gather")([y, index])
 
-            # RMS loss
-            # return K.mean((K.square(y_pred - y_true))) * reward
+        def loss(target, prediction):
+            return - K.log(prediction) * target
 
-        self.train_model = Model([*inputs, reward], train_out)
-        self.train_model.compile(loss=custom_loss, optimizer=self.optimizer)
-        self.predict_model = Model(inputs, predict_out)
-        # self.predict_model.compile(loss=custom_loss, optimizer=self.optimizer)
+        self.model_train = models.Model([*image_inputs, index, temperature_input],
+                                 y_selected, name="S_train")
+        self.model_train.compile(loss=loss, optimizer=optimizer(learning_rate))
 
-
-class SenderInformed(Agent):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._build_model(**kwargs)
-
-    def _build_model(self, input_sizes, embedding_size, n_filters, output_size, use_bias=True, **kwargs):
-        n_inputs = len(self.input_sizes)
-        inputs = [layers.Input(shape=self.input_sizes[i],
-                               name=f"input_{i}")
-                  for i in range(n_inputs)]
-        embs = [layers.Dense(self.embedding_size,
-                             activation='sigmoid',
-                             use_bias=self.use_bias,
-                             # kernel_initializer=init.glorot_uniform(seed=42),
-                             # kernel_regularizer=l2(0.001),
-                             name=f"embed_{i}")
-                for i in range(n_inputs)]
-
-        emb = layers.Dense(self.embedding_size,
-                           activation='sigmoid',
-                           use_bias=self.use_bias,
-                           # kernel_initializer=init.glorot_uniform(seed=42),
-                           # kernel_regularizer=l2(0.001),
-                           name=f"embed_img")
-
-        imgs = [embs[i](inputs[i]) for i in range(n_inputs)]  # separate embedding layer for each image
-        # imgs = [emb(inputs[i]) for i in range(n_inputs)]  # same embedding layer for all images
-
-        stack = layers.Lambda(lambda x: K.stack(x, axis=1), name="stack")
-        reshape = layers.Reshape((-1, self.embedding_size, 1))
-        feat_filters = layers.Conv2D(filters=n_filters,
-                                     kernel_size=(2, 1),
-                                     activation="sigmoid",
-                                     # padding="same",
-                                     # strides=embedding_size,
-                                     # data_format="channels_last",
-                                     name="feature_filters"
-                                     )
-
-        voc_filter = layers.Conv2D(1, (1, n_filters),
-                                   # padding="same",
-                                   data_format="channels_first",
-                                   name="vocab_filter"
-                                   )
-
-        dense = layers.Dense(output_size, name="output_dense")
-
-        out = dense(layers.Flatten()(voc_filter(feat_filters(reshape(stack(imgs))))))
-
-        temp = layers.Lambda(lambda x: x / 10, name="gibbs_temp")
-        soft = layers.Activation("softmax", name="softmax")
-        predict_out = soft(temp(out))
-        train_out = soft(out)
-
-        reward = layers.Input((1,), name="reward")
-
-        def custom_loss(y_true, y_pred):
-            # Cross-entropy 1 (??)
-            # log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
-            # return K.mean(log_lik * reward, keepdims=True)
-
-            # Cross-entropy 2
-            return K.sum(K.log(y_pred) * y_true) * reward
-
-            # RMS loss
-            # return K.mean((K.square(y_pred - y_true))) * reward
-
-        self.train_model = Model([*inputs, reward], train_out)
-        self.train_model.compile(loss=custom_loss, optimizer=self.optimizer)
-        self.predict_model = Model(inputs, predict_out)
+        if verbose:
+            self.model.summary()
+            self.model_train.summary()
 
 
 class Receiver(Agent):
-    def __init__(self, mode="dot", **kwargs):
-        super().__init__(**kwargs)
-        self.mode = mode
-        self._build_model()
+    def __init__(self,
+                 name: str,
+                 **kwargs):
+        super(Receiver, self).__init__(name=name,
+                                       role="receiver")
+        self._build_model(**kwargs)
+        self.reset_memory()
 
-    def _build_model(self, **kwargs):
-        n_input_images = len(self.input_sizes) - 1
-        inputs = [layers.Input(shape=self.input_sizes[i],
-                               name=f"input_{i}")
-                  for i in range(n_input_images)]
-        embs = [layers.Dense(self.embedding_size,
-                             activation='linear',
-                             use_bias=self.use_bias,
-                             # kernel_initializer=init.glorot_uniform(seed=42),
-                             # kernel_regularizer=l2(0.001),
-                             name=f"embed_{i}")
-                for i in range(n_input_images)]
-        emb = layers.Dense(self.embedding_size,
-                           activation='linear',
-                           use_bias=self.use_bias,
-                           # kernel_initializer=init.glorot_uniform(seed=42),
-                           # kernel_regularizer=l2(0.001),
-                           name=f"embed_img")
+    def _build_model(self, n_images, input_image_shape, embedding_size, vocabulary_size, optimizer,
+                     learning_rate, verbose=False, **kwargs):
+        image_inputs = [layers.Input(shape=input_image_shape, name=f"R_image_in_{i}", dtype="float32")
+                        for i in range(n_images)]
+        image_embedding_layer = layers.Dense(embedding_size, name="R_image_embedding")
 
-        # imgs = [embs[i](inputs[i]) for i in range(n_input_images)]  # separate embedding layer for each image
-        imgs = [emb(inputs[i]) for i in range(n_input_images)]  # same embedding layer for all images
+        temperature_input = layers.Input(shape=[], dtype="float32", name="R_temperature_input")
+        softmax = layers.Softmax()
 
-        symbol_shape = self.input_sizes[-1]
-        sym_input = layers.Input(shape=symbol_shape, dtype="int32", name="input_sym")
-        emb_sym = layers.Embedding(input_dim=self.n_symbols,
-                                   output_dim=self.embedding_size,
-                                   name=f"embed_sym")
-        flat = layers.Flatten()
-        symbol = flat(emb_sym(sym_input))
+        symbol_input = layers.Input(shape=[1], dtype="int32", name=f"R_symbol_in")
+        symbol_embedding = layers.Embedding(input_dim=vocabulary_size,
+                                            output_dim=embedding_size,
+                                            name="R_symbol_embedding")
+        dot_product = layers.Dot(axes=-1, name="R_dot_product")
 
-        if self.mode == "dot":
-            dot = layers.Dot(axes=1)
-            dot_prods = [dot([img, symbol]) for img in imgs]
-            out = layers.concatenate(dot_prods, axis=-1)
-            # out = layers.Activation("sigmoid")(out)
-        elif self.mode == "cosine":
-            # basically normalized dot product
-            norm = layers.Lambda(lambda v: K.l2_normalize(v))
-            dot = layers.Dot(axes=1)
-            dot_prods = [dot([norm(img), norm(symbol)]) for img in imgs]
-            out = layers.concatenate(dot_prods, axis=-1)
-        elif self.mode == "dense":
-            dense_join = layers.Dense(self.embedding_size,
-                                      activation="sigmoid",
-                                      # kernel_initializer=init.glorot_uniform(seed=42),
-                                      name=f"dense_join")
-            dense_out = layers.Dense(self.output_size,
-                                     # kernel_initializer=init.glorot_uniform(seed=42),
-                                     name=f"dense_out")
-            out = dense_out(dense_join(layers.concatenate([*imgs, symbol], axis=-1)))
-        else:
-            raise ValueError(f"'{self.mode}' is not a valid mode.")
+        y_images = [image_embedding_layer(x) for x in image_inputs]
+        y_symbol = symbol_embedding(symbol_input)
+        y = [dot_product([img, y_symbol]) for img in y_images]
+        y = layers.concatenate(y, axis=-1)
+        y = y / temperature_input
+        y = softmax(y)
 
-        # cossim = layers.Lambda(cosine_distance, output_shape=(1,))
-        # sims = [cossim([img, symbol]) for img in imgs]
-        # out = layers.concatenate(sims, axis=-1)
-        # p = print_layer(out, "rec 1")
-        temp = layers.Lambda(lambda x: x / self.gibbs_temp)
-        soft = layers.Activation("softmax")
-        predict_out = soft(temp(out))
-        train_out = soft(out)
-        # train_out = out
+        self.model = models.Model([*image_inputs, symbol_input, temperature_input], y, name="R_predict")
 
-        reward = layers.Input((1,), name="reward")
+        index = layers.Input(shape=[1], dtype="int32", name="R_index_in")
+        y_selected = layers.Lambda(
+            lambda probs_index: tf.gather(*probs_index, axis=-1),
+            name="R_gather")([y, index])
 
-        def custom_loss(y_true, y_pred):
-            # Cross-entropy 1 (??)
-            # log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
-            # return K.mean(log_lik * reward, keepdims=True)
+        # @tf.function
+        def loss(target, prediction):
+            return - K.log(prediction) * target
 
-            # Cross-entropy 2
-            return K.sum(K.log(y_pred) * y_true) * reward
+        self.model_train = models.Model([*image_inputs, symbol_input, index, temperature_input],
+                                 y_selected, name="R_train")
+        self.model_train.compile(loss=loss, optimizer=optimizer(learning_rate))
 
-            # RMS loss
-            # return K.mean((K.square(y_pred - y_true))) * reward
-
-        self.train_model = Model([*inputs, sym_input, reward], train_out)
-        self.train_model.compile(loss=custom_loss, optimizer=self.optimizer)
-        self.predict_model = Model([*inputs, sym_input], predict_out)
+        if verbose:
+            self.model.summary()
+            self.model_train.summary()

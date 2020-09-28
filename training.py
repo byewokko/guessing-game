@@ -122,10 +122,10 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
                             print("EARLY STOPPING")
                             break
 
-            sendr1_loss.append(agent1.net["sender"].last_loss)
-            sendr2_loss.append(agent2.net["sender"].last_loss)
-            recvr1_loss.append(agent1.net["receiver"].last_loss)
-            recvr2_loss.append(agent2.net["receiver"].last_loss)
+            sendr1_loss.append(agent1.get_last_loss(net_name="sender"))
+            sendr2_loss.append(agent2.get_last_loss(net_name="sender"))
+            recvr1_loss.append(agent1.get_last_loss(net_name="receiver"))
+            recvr2_loss.append(agent2.get_last_loss(net_name="receiver"))
             if not episode % 50:
                 print(f"Episode {episode}")
                 print(f"Batch success rate {success_rate_avg[-1]}, std {success_rate_variance[-1] ** (1 / 2)}")

@@ -1,6 +1,6 @@
 from utils.set_seed import set_seed
 
-set_seed(5)
+set_seed(0)
 
 import os
 import yaml
@@ -11,7 +11,7 @@ TIMESTAMP = datetime.now().strftime("%y%m%d-%H%M%S")
 
 import training
 from game.game import Game
-from agent import q_agent
+from agent import q_agent, reinforce_agent
 from utils.dataprep import load_emb_gz, make_categories
 
 SETTINGS_FILE = "settings.yaml"
@@ -56,6 +56,10 @@ def run_training(model_dir, load_file, save_file, dataset, use_categories,
     if model_type == "reinforce":
         agent1 = q_agent.MultiAgentReinforce(name="01", role="sender", **agent_args)
         agent2 = q_agent.MultiAgentReinforce(name="02", role="receiver", **agent_args)
+    if model_type == "reinforce_new":
+        agent_args = reinforce_agent.convert_parameter_dict(agent_args)
+        agent1 = reinforce_agent.Sender(name="01", role="sender", **agent_args)
+        agent2 = reinforce_agent.Receiver(name="02", role="receiver", **agent_args)
     else:
         agent1 = q_agent.MultiAgent(name="01", role="sender", **agent_args)
         agent2 = q_agent.MultiAgent(name="02", role="receiver", **agent_args)

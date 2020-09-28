@@ -148,6 +148,9 @@ class MultiAgent(Agent):
     def get_active_name(self):
         return f"{self.name}.{self.role}"
 
+    def get_last_loss(self, net_name: str):
+        return self.net[net_name].last_loss
+
     def _build_model(self, input_shapes, n_symbols, embedding_size=EMBEDDING_SIZE, n_informed_filters=20,
                      use_bias=USE_BIAS, loss=LOSS, optimizer=OPTIMIZER, learning_rate=LEARNING_RATE,
                      mode="dot", sender_type="agnostic", dropout=0, shared_embedding=True,
