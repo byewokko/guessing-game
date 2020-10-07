@@ -54,12 +54,13 @@ def run_training(model_dir, load_file, save_file, dataset, use_categories,
     agent_args["model_type"] = model_type
 
     if model_type == "reinforce":
-        agent1 = q_agent.MultiAgentReinforce(name="01", role="sender", **agent_args)
-        agent2 = q_agent.MultiAgentReinforce(name="02", role="receiver", **agent_args)
-    if model_type == "reinforce_new":
         agent_args = reinforce_agent.convert_parameter_dict(agent_args)
-        agent1 = reinforce_agent.Sender(name="01", role="sender", **agent_args)
-        agent2 = reinforce_agent.Receiver(name="02", role="receiver", **agent_args)
+        agent1 = reinforce_agent.Sender(name="01", **agent_args)
+        agent2 = reinforce_agent.Receiver(name="02", **agent_args)
+    elif model_type == "reinforce_multi":
+        agent_args = reinforce_agent.convert_parameter_dict(agent_args)
+        agent1 = reinforce_agent.MultiAgent(name="01", role="sender", **agent_args)
+        agent2 = reinforce_agent.MultiAgent(name="02", role="receiver", **agent_args)
     else:
         agent1 = q_agent.MultiAgent(name="01", role="sender", **agent_args)
         agent2 = q_agent.MultiAgent(name="02", role="receiver", **agent_args)

@@ -1,5 +1,6 @@
-import typing
+# from __future__ import annotations
 
+import typing
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras.models as models
@@ -8,6 +9,7 @@ import tensorflow.keras.optimizers as optim
 import tensorflow.keras.backend as K
 
 import sys
+
 sys.path.append("..")
 
 from utils.debug import get_shape
@@ -48,12 +50,138 @@ def convert_parameter_dict(old_params: dict):
     return new_params
 
 
+def build_sender_model(n_images: int,
+                       input_image_shape: typing.Iterable,
+                       embedding_size: int,
+                       vocabulary_size: int,
+                       optimizer: typing.Type[optim.Optimizer],
+                       learning_rate: float,
+                       sender_type: str = "agnostic",
+                       verbose: bool = False,
+                       image_embedding_layer: typing.Optional[layers.Layer] = None,
+                       **kwargs) -> (models.Model, models.Model):
+    image_inputs = [layers.Input(shape=input_image_shape, name=f"image_in_{i}", dtype="float32")
+                    for i in range(n_images)]
+    if not image_embedding_layer:
+        image_embedding_layer = layers.Dense(embedding_size, name="image_embedding")
+
+    # agnostic part
+    sigmoid = layers.Activation("sigmoid", name="sigmoid")
+    output_layer = layers.Dense(vocabulary_size, name="output")
+
+    # informed part
+    stack = layers.Lambda(lambda x: K.stack(x, axis=1), name="stack")
+    permute = layers.Permute([2, 1], name="permute")
+    feature_filters = layers.Conv1D(filters=vocabulary_size,
+                                    kernel_size=(1,),
+                                    input_shape=[n_images, embedding_size],
+                                    activation="sigmoid",
+                                    data_format="channels_last",
+                                    name="feature_filters")
+    vocabulary_filter = layers.Conv1D(1,
+                                      kernel_size=(1,),
+                                      data_format="channels_last",
+                                      name="vocabulary_filter")
+    flatten = layers.Flatten()
+
+    temperature_input = layers.Input(shape=[], dtype="float32", name="temperature_input")
+
+    softmax = layers.Softmax()
+
+    y = [image_embedding_layer(x) for x in image_inputs]
+    if sender_type == "agnostic":
+        y = [sigmoid(x) for x in y]
+        y = layers.concatenate(y, axis=-1)
+        y = output_layer(y)
+    elif sender_type == "informed":
+        y = stack(y)
+        y = permute(y)
+        y = feature_filters(y)
+        y = permute(y)
+        y = vocabulary_filter(y)
+        y = flatten(y)
+
+    y = y / temperature_input
+    y = softmax(y)
+
+    model_predict = models.Model([*image_inputs, temperature_input], y, name="predict")
+
+    index = layers.Input(shape=[1], dtype="int32", name="index_in")
+    y_selected = layers.Lambda(
+        lambda probs_index: tf.gather(*probs_index, axis=-1),
+        name="gather")([y, index])
+
+    def loss(target, prediction):
+        return - K.log(prediction) * target
+
+    model_train = models.Model([*image_inputs, index, temperature_input],
+                               y_selected, name="train")
+    model_train.compile(loss=loss, optimizer=optimizer(learning_rate))
+
+    if verbose:
+        model_predict.summary()
+        model_train.summary()
+
+    return model_predict, model_train
+
+
+def build_receiver_model(n_images: int,
+                         input_image_shape: typing.Iterable,
+                         embedding_size: int,
+                         vocabulary_size: int,
+                         optimizer: typing.Type[optim.Optimizer],
+                         learning_rate: float,
+                         verbose: bool = False,
+                         image_embedding_layer: typing.Optional[layers.Layer] = None,
+                         **kwargs) -> (models.Model, models.Model):
+    image_inputs = [layers.Input(shape=input_image_shape, name=f"image_in_{i}", dtype="float32")
+                    for i in range(n_images)]
+    if not image_embedding_layer:
+        image_embedding_layer = layers.Dense(embedding_size, name="image_embedding")
+
+    temperature_input = layers.Input(shape=[], dtype="float32", name="temperature_input")
+    softmax = layers.Softmax()
+
+    symbol_input = layers.Input(shape=[1], dtype="int32", name=f"symbol_in")
+    symbol_embedding = layers.Embedding(input_dim=vocabulary_size,
+                                        output_dim=embedding_size,
+                                        name="symbol_embedding")
+    dot_product = layers.Dot(axes=-1, name="dot_product")
+
+    y_images = [image_embedding_layer(x) for x in image_inputs]
+    y_symbol = symbol_embedding(symbol_input)
+    y = [dot_product([img, y_symbol]) for img in y_images]
+    y = layers.concatenate(y, axis=-1)
+    y = y / temperature_input
+    y = softmax(y)
+
+    model_predict = models.Model([*image_inputs, symbol_input, temperature_input], y, name="predict")
+
+    index = layers.Input(shape=[1], dtype="int32", name="index_in")
+    y_selected = layers.Lambda(
+        lambda probs_index: tf.gather(*probs_index, axis=-1),
+        name="gather")([y, index])
+
+    def loss(target, prediction):
+        return - K.log(prediction) * target
+
+    model_train = models.Model([*image_inputs, symbol_input, index, temperature_input],
+                               y_selected, name="train")
+    model_train.compile(loss=loss, optimizer=optimizer(learning_rate))
+
+    if verbose:
+        model_predict.summary()
+        model_train.summary()
+
+    return model_predict, model_train
+
+
 class Agent:
     def __init__(self,
                  name: str,
                  role: str,
                  temperature: float = TEMPERATURE,
-                 **kwargs):
+                 **kwargs: dict):
         self.name: str = name
         self.role: str = role
         self.model: typing.Optional[models.Model] = None
@@ -65,6 +193,12 @@ class Agent:
 
     def _build_model(self, *args, **kwargs):
         raise NotImplementedError
+
+    def set_model(self,
+                  model_predict: models.Model,
+                  model_train: models.Model):
+        self.model = model_predict
+        self.model_train = model_train
 
     def act(self, state: list, **kwargs):
         probs = np.squeeze(self.predict(state))
@@ -103,7 +237,7 @@ class Agent:
             temperature = self.temperature
         x = [np.expand_dims(s, axis=0) for s in state]
         x.append(np.asarray([action]))
-        x.append(np.asarray([self.temperature]))
+        x.append(np.asarray([temperature]))
         # print(get_shape(x), get_shape(target))
         loss = self.model_train.train_on_batch(x=x, y=target)
         self.last_loss = loss
@@ -126,7 +260,7 @@ class Agent:
             temperature = self.temperature
         loss = []
         for x, y in zip(self.memory_x, self.memory_y):
-            x = [*x, np.array([self.temperature])]
+            x = [*x, np.array([temperature])]
             loss.append(self.model_train.train_on_batch(x=x, y=y))
         if reset_after:
             self.reset_memory()
@@ -134,7 +268,7 @@ class Agent:
         return loss
 
     def get_last_loss(self, net_name: str = None):
-        if net_name == self.role:
+        if not net_name or net_name == self.role:
             return self.last_loss
         else:
             return np.NaN
@@ -158,69 +292,8 @@ class Sender(Agent):
         self._build_model(**kwargs)
         self.reset_memory()
 
-    def _build_model(self, n_images, input_image_shape, embedding_size, vocabulary_size, optimizer,
-                    learning_rate, sender_type="agnostic", verbose=False, **kwargs):
-        image_inputs = [layers.Input(shape=input_image_shape,
-                                     name=f"S_image_in_{i}",
-                                     dtype="float32") for i in range(n_images)]
-        image_embedding_layer = layers.Dense(embedding_size,
-                                             name="S_image_embedding")
-        # agnostic part
-        sigmoid = layers.Activation("sigmoid", name="S_sigmoid")
-        output_layer = layers.Dense(vocabulary_size, name="S_output")
-
-        # informed part
-        stack = layers.Lambda(lambda x: K.stack(x, axis=1), name="S_stack")
-        permute = layers.Permute([2, 1], name="S_permute")
-        feature_filters = layers.Conv1D(filters=vocabulary_size,
-                                        kernel_size=(1,),
-                                        input_shape=[n_images, embedding_size],
-                                        activation="sigmoid",
-                                        data_format="channels_last",
-                                        name="S_feature_filters")
-        vocabulary_filter = layers.Conv1D(1,
-                                          kernel_size=(1,),
-                                          data_format="channels_last",
-                                          name="S_vocabulary_filter")
-        flatten = layers.Flatten()
-
-        temperature_input = layers.Input(shape=[], dtype="float32", name="R_temperature_input")
-
-        softmax = layers.Softmax()
-
-        y = [image_embedding_layer(x) for x in image_inputs]
-        if sender_type == "agnostic":
-            y = [sigmoid(x) for x in y]
-            y = layers.concatenate(y, axis=-1)
-            y = output_layer(y)
-        elif sender_type == "informed":
-            y = stack(y)
-            y = permute(y)
-            y = feature_filters(y)
-            y = permute(y)
-            y = vocabulary_filter(y)
-            y = flatten(y)
-
-        y = y / temperature_input
-        y = softmax(y)
-
-        self.model = models.Model([*image_inputs, temperature_input], y, name="S_predict")
-
-        index = layers.Input(shape=[1], dtype="int32", name="S_index_in")
-        y_selected = layers.Lambda(
-            lambda probs_index: K.gather(probs_index[0][0], probs_index[1]),
-            name="S_gather")([y, index])
-
-        def loss(target, prediction):
-            return - K.log(prediction) * target
-
-        self.model_train = models.Model([*image_inputs, index, temperature_input],
-                                 y_selected, name="S_train")
-        self.model_train.compile(loss=loss, optimizer=optimizer(learning_rate))
-
-        if verbose:
-            self.model.summary()
-            self.model_train.summary()
+    def _build_model(self, **kwargs):
+        self.set_model(*build_sender_model(**kwargs))
 
 
 class Receiver(Agent):
@@ -232,43 +305,95 @@ class Receiver(Agent):
         self._build_model(**kwargs)
         self.reset_memory()
 
-    def _build_model(self, n_images, input_image_shape, embedding_size, vocabulary_size, optimizer,
-                     learning_rate, verbose=False, **kwargs):
-        image_inputs = [layers.Input(shape=input_image_shape, name=f"R_image_in_{i}", dtype="float32")
-                        for i in range(n_images)]
-        image_embedding_layer = layers.Dense(embedding_size, name="R_image_embedding")
+    def _build_model(self, **kwargs):
+        self.set_model(*build_receiver_model(**kwargs))
 
-        temperature_input = layers.Input(shape=[], dtype="float32", name="R_temperature_input")
-        softmax = layers.Softmax()
 
-        symbol_input = layers.Input(shape=[1], dtype="int32", name=f"R_symbol_in")
-        symbol_embedding = layers.Embedding(input_dim=vocabulary_size,
-                                            output_dim=embedding_size,
-                                            name="R_symbol_embedding")
-        dot_product = layers.Dot(axes=-1, name="R_dot_product")
+class MultiAgent(Agent):
+    """
+    Includes both a sender network and a receiver network. Allows for switching between the two roles.
+    """
 
-        y_images = [image_embedding_layer(x) for x in image_inputs]
-        y_symbol = symbol_embedding(symbol_input)
-        y = [dot_product([img, y_symbol]) for img in y_images]
-        y = layers.concatenate(y, axis=-1)
-        y = y / temperature_input
-        y = softmax(y)
+    def __init__(self,
+                 name: str,
+                 role: str,
+                 **kwargs):
+        assert role in ("sender", "receiver")
+        super(MultiAgent, self).__init__(name=name,
+                                         role=role)
+        self.net: typing.Dict[str, typing.Optional[Agent]] = {
+            "sender": None,
+            "receiver": None
+        }
+        self._build_model(**kwargs)
+        self.reset_memory()
 
-        self.model = models.Model([*image_inputs, symbol_input, temperature_input], y, name="R_predict")
+    def _build_model(self, shared_embedding, embedding_size, **kwargs):
+        if shared_embedding:
+            image_embedding_layer = layers.Dense(embedding_size, name="shared_image_embedding")
+        else:
+            image_embedding_layer = None
+        self.net["sender"] = Agent(name="sender_rf", role="sender")
+        self.net["receiver"] = Agent(name="receiver_rf", role="receiver")
+        self.net["sender"].set_model(*build_sender_model(image_embedding_layer=image_embedding_layer,
+                                                         embedding_size=embedding_size,
+                                                         **kwargs))
+        self.net["receiver"].set_model(*build_receiver_model(image_embedding_layer=image_embedding_layer,
+                                                             embedding_size=embedding_size,
+                                                             **kwargs))
 
-        index = layers.Input(shape=[1], dtype="int32", name="R_index_in")
-        y_selected = layers.Lambda(
-            lambda probs_index: tf.gather(*probs_index, axis=-1),
-            name="R_gather")([y, index])
+    def switch_role(self):
+        if self.role == "sender":
+            self.role = "receiver"
+        else:
+            self.role = "sender"
 
-        # @tf.function
-        def loss(target, prediction):
-            return - K.log(prediction) * target
+    def active_net(self):
+        return self.net[self.role]
 
-        self.model_train = models.Model([*image_inputs, symbol_input, index, temperature_input],
-                                 y_selected, name="R_train")
-        self.model_train.compile(loss=loss, optimizer=optimizer(learning_rate))
+    def act(self, state: list, **kwargs):
+        return self.active_net().act(state, **kwargs)
 
-        if verbose:
-            self.model.summary()
-            self.model_train.summary()
+    def batch_train(self):
+        self.active_net().batch_train()
+
+    def reset_batch(self):
+        self.active_net().reset_batch()
+
+    def prepare_batch(self, *args, **kwargs):
+        pass
+
+    def load(self, name: str):
+        self.model.load_weights(name)
+
+    def save(self, name: str):
+        self.model.save_weights(name)
+
+    def predict(self, state: list, temperature: typing.Optional[float] = None):
+        return self.active_net().predict(state, temperature)
+
+    def update(self, state: list, action: np.array, target: np.array, temperature: typing.Optional[float] = None):
+        return self.active_net().update(state, action, target, temperature)
+
+    def remember(self, state: list, action: np.array, target: np.array):
+        self.active_net().remember(state, action, target)
+
+    def reset_memory(self):
+        self.active_net().reset_memory()
+
+    def update_on_batch(self, reset_after: bool = True, temperature: typing.Optional[float] = None):
+        return self.active_net().update_on_batch(reset_after, temperature)
+
+    def get_last_loss(self, net_name: str = None):
+        if not net_name:
+            return self.active_net().get_last_loss()
+        elif net_name in self.net:
+            return self.net[net_name].last_loss
+        else:
+            return np.NaN
+
+    def set_temperature(self, temperature: float):
+        self.active_net().set_temperature(temperature)
+
+    def adjust_temperature(self, loss: float):
+        self.active_net().adjust_temperature(loss)

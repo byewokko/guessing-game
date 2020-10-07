@@ -11,14 +11,14 @@ load_file: False
 save_file: "{TIMESTAMP}-reinforce"
 
 # Roles mode: switch or fixed
-#roles: switch
-roles: fixed
+roles: switch
+#roles: fixed
 
 # Number of episodes to play in total
 n_episodes: 50000
 
 # Training batch size, also the number of episodes between updates
-batch_size: 20
+batch_size: 30
 
 # Path to embedding file
 #dataset: data/mcrae-484x50-vgg19.emb.gz
@@ -35,7 +35,7 @@ trim_dataset_to_n_images: False
 use_categories: True
 
 # Number of symbols that the agents use to communicate
-vocabulary_size: 50
+vocabulary_size: 100
 
 # Size of the first layer in the agents' networks
 embedding_size: 50
@@ -50,11 +50,11 @@ explore: gibbs
 
 # Gibbs temperature value
 # The temperature layer is omitted if gibbs_temperature is 0
-gibbs_temperature: 0
+gibbs_temperature: 10
 
 # Sender type: agnostic or informed
-#sender_type: agnostic
-sender_type: informed
+sender_type: agnostic
+#sender_type: informed
 
 # Number of CNN filters used by the informed sender
 n_informed_filters: 20
@@ -87,8 +87,8 @@ shared_experience: False
 #shared_experience: True
 
 # Share the first, embedding layer between the sender and receiver component within each agent
-shared_embedding: False
-#shared_embedding: True
+#shared_embedding: False
+shared_embedding: True
 
 # Activation function applied to the network output
 #out_activation: sigmoid
@@ -102,7 +102,7 @@ stop_when_goal_is_passed: False
 #model_type: old
 #model_type: new
 #model_type: reinforce
-model_type: reinforce_new
+model_type: reinforce_multi
 
 # Save training curves in a csv dataframe
 save_learning_curves: False
