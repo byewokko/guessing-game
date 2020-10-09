@@ -15,7 +15,7 @@ def equivalent_error_rate(q1, err, q2, n=500):
     return stats.binom.ppf(cdf, n, q2) / n
 
 
-def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_active_images,
+def run_training(game, agent1, agent2, n_episodes, batch_size, n_active_images, batch_mode="last",
                  roles="switch", show_plot=True, explore="gibbs", gibbs_temperature=0.01, early_stopping=False,
                  memory_sampling_distribution="linear", shared_experience=False, stop_when_goal_is_passed=False,
                  **kwargs):
@@ -49,8 +49,8 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, batch_mode, n_act
 
     # Goal: with 2 images (50% chance) reach 90% accuracy
     # For other number of images compute equivalent accuracy level
-    goal1 = 1 - equivalent_error_rate(0.5, 0.1, 1 - 1 / n_active_images)
-    goal2 = 1 - equivalent_error_rate(0.5, 0.05, 1 - 1 / n_active_images)
+    goal1 = 1 - equivalent_error_rate(0.5, 0.25, 1 - 1 / n_active_images)
+    goal2 = 1 - equivalent_error_rate(0.5, 0.1, 1 - 1 / n_active_images)
     goal1_reached = False
     goal2_reached = False
     print(f"Goal 1: {goal1:.4f} success rate")

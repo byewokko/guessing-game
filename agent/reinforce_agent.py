@@ -364,10 +364,12 @@ class MultiAgent(Agent):
         pass
 
     def load(self, name: str):
-        self.model.load_weights(name)
+        self.net["sender"].model.load_weights(f"{name}.snd")
+        self.net["receiver"].model.load_weights(f"{name}.rcv")
 
     def save(self, name: str):
-        self.model.save_weights(name)
+        self.net["sender"].model.save_weights(f"{name}.snd")
+        self.net["receiver"].model.save_weights(f"{name}.rcv")
 
     def predict(self, state: list, temperature: typing.Optional[float] = None):
         return self.active_net().predict(state, temperature)

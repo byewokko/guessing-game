@@ -79,7 +79,7 @@ memory_sampling_distribution: linear
 
 # Dropout applied after first (embedding) layer
 # (doesn't make difference)
-dropout: 0
+#dropout: 0
 
 # Sharing experience with both agents
 # Motivation: Player keeps track of his opponent's actions as well to improve his own strategy.
@@ -108,3 +108,16 @@ model_type: reinforce_multi
 save_learning_curves: False
 
 early_stopping: False
+
+sender_settings:
+  temperature: null
+  embedding_size: null
+  shared_embedding: null
+#  sender_type: informed
+  sender_type: agnostic
+  n_informed_filters: 20
+
+receiver_settings:
+  temperature: null
+  embedding_size: null
+  shared_embedding: null
