@@ -1,3 +1,5 @@
+import pickle
+
 import numpy as np
 import os
 import gzip
@@ -66,6 +68,14 @@ def load_emb_gz(filename, n_items=None):
     f.close()
     print(f"DONE. {len(ind2word)} items loaded from {filename}.")
     return word2ind, ind2word, np.stack(embeddings)
+
+
+def load_emb_pickled(filename):
+    with gzip.open(filename + ".npy.gz", "rb") as f:
+        embeddings = np.load(f)
+    with open(filename + ".meta.pkl", "rb") as f:
+        meta = pickle.load(f)
+    return meta, embeddings
 
 
 def make_categories(filenames, sep=None):

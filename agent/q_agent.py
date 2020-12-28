@@ -1,9 +1,9 @@
 import numpy as np
 from datetime import datetime as dt
-from keras.models import Model
-import keras.layers as layers
-import keras.optimizers as optim
-import keras.backend as K
+from tensorflow.keras.models import Model
+import tensorflow.keras.layers as layers
+import tensorflow.keras.optimizers as optim
+import tensorflow.keras.backend as K
 import tensorflow as tf
 
 from agent import component
