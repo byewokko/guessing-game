@@ -71,10 +71,16 @@ def load_emb_gz(filename, n_items=None):
 
 
 def load_emb_pickled(filename):
+    print(f"Loading features from {filename}.npy.gz")
     with gzip.open(filename + ".npy.gz", "rb") as f:
         embeddings = np.load(f)
+    print(f"Loading metadata from {filename}.meta.pkl")
     with open(filename + ".meta.pkl", "rb") as f:
         meta = pickle.load(f)
+    uniq, classes = np.unique(meta["classes"], return_inverse=True)
+    print(f"{len(uniq)} categories found.")
+    meta["class_idx"] = classes
+    meta["class_names"] = uniq
     return meta, embeddings
 
 

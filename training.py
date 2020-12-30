@@ -197,7 +197,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, n_active_images, 
     return result_dict, learning_curves
 
 
-def run_test(game, agent1, agent2, res_file, n_episodes, batch_size, n_active_images,
+def run_test(game, agent1, agent2, results_file, n_episodes, batch_size, n_active_images,
              roles="switch", show_plot=False, explore=None, gibbs_temperature=0.01, **kwargs):
     # Set up the logging of results
     columns = "sender_name,receiver_name,active_images,target_image,chosen_symbol,chosen_symbol_p,\
@@ -266,6 +266,6 @@ def run_test(game, agent1, agent2, res_file, n_episodes, batch_size, n_active_im
             avg_success = df_results[-200:]["success"].sum() / 200
             print(f"Episode {episode}, average success: {avg_success}")
 
-    df_results.to_csv(res_file, line_terminator="\n")
+    df_results.to_csv(results_file, line_terminator="\n")
     print("Test finished")
     # plt.show(block=True)

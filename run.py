@@ -1,3 +1,4 @@
+import utils
 from utils.set_seed import set_seed
 
 set_seed(0)
@@ -14,116 +15,38 @@ from game.game import Game
 from agent import q_agent, reinforce_agent
 from utils.dataprep import load_emb_gz, make_categories
 
-SETTINGS_FILE = "settings.yaml"
+SETTINGS_FILE = "settings.yml"
 
 
-def run_training(model_dir, load_file, save_file, dataset, use_categories,
-                 vocabulary_size, n_active_images,  model_type="old", trim_dataset_to_n_images=False,
-                 **experiment_args):
+def run(
+        mode,
+        model_dir,
+        load_file,
+        save_file,
+        dataset,
+        n_active_images,
+        vocabulary_size,
+        model_type,
+        **kwargs):
     save_file = save_file.format(TIMESTAMP=TIMESTAMP)
-    print(f"Loading image embeddings from '{dataset}' ...")
-    path2ind, path_list, embeddings = load_emb_gz(dataset, trim_dataset_to_n_images)
-    if use_categories:
-        categories = make_categories(path_list)
-    else:
-        categories = None
-
-    game_args = {
-        "images": embeddings,
-        "images_filenames": path_list,
-        "categories": categories
-    }
-
-    for k in ("reward_sender", "reward_receiver", "reward"):
-        if k in experiment_args:
-            game_args[k] = experiment_args[k]
+    metadata, features = utils.dataprep.load_emb_pickled(dataset)
 
     agent_args = {
-        "input_shapes": [embeddings[0].shape] * n_active_images + [(1,)],
-        "output_size": vocabulary_size,
+        "input_shapes": [features[0].shape] * n_active_images + [(1,)],
+        "vocabulary_size": vocabulary_size,
         "n_symbols": vocabulary_size,
+        "n_images": n_active_images,
+        "input_image_shape": features[0].shape
     }
 
-    for k in ("sender_type", "n_informed_filters", "embedding_size", "learning_rate", "gibbs_temperature",
-              "loss", "optimizer", "use_bias", "explore", "batch_mode", "memory_sampling_distribution", "dropout",
-              "shared_embedding", "out_activation", "model_type"):
-        if k in experiment_args:
-            agent_args[k] = experiment_args[k]
-
-    filename = os.path.join(model_dir, save_file)
-    agent_args["model_type"] = model_type
+    for k in ("embedding_size", "learning_rate", "gibbs_temperature", "loss", "optimizer",
+              "explore", "model_type", "sender_settings", "receiver_settings", "shared_embedding"):
+        if k in kwargs:
+            agent_args[k] = kwargs[k]
 
     if model_type == "reinforce":
-        agent_args = reinforce_agent.convert_parameter_dict(agent_args)
-        agent1 = reinforce_agent.Sender(name="01", **agent_args)
-        agent2 = reinforce_agent.Receiver(name="02", **agent_args)
-    elif model_type == "reinforce_multi":
-        agent_args = reinforce_agent.convert_parameter_dict(agent_args)
         agent1 = reinforce_agent.MultiAgent(name="01", role="sender", **agent_args)
         agent2 = reinforce_agent.MultiAgent(name="02", role="receiver", **agent_args)
-    else:
-        agent1 = q_agent.MultiAgent(name="01", role="sender", **agent_args)
-        agent2 = q_agent.MultiAgent(name="02", role="receiver", **agent_args)
-
-    if load_file:
-        print(f"Loading weights from '{filename}' ...")
-        agent1.load(f"{filename}.01")
-        agent2.load(f"{filename}.02")
-
-    game = Game(**game_args)
-
-    results = None
-
-    results, learning_curves = training.run_training(game, agent1, agent2,
-                                                     n_active_images=n_active_images,
-                                                     **experiment_args)
-    if save_file:
-        print(f"Saving weights to '{filename}.*' ...")
-        agent1.save(f"{filename}.01")
-        agent2.save(f"{filename}.02")
-        learning_curves.to_csv(f"{filename}.curves.csv")
-
-    print(results)
-    return results
-
-
-def run_test(model_dir, load_file, save_file, dataset, use_categories, model_type,
-             vocabulary_size, n_active_images, trim_dataset_to_n_images=False, **experiment_args):
-    save_file = save_file.format(TIMESTAMP=TIMESTAMP)
-    print(f"Loading image embeddings from '{dataset}' ...")
-    path2ind, path_list, embeddings = load_emb_gz(dataset, trim_dataset_to_n_images)
-    if use_categories:
-        categories = make_categories(path_list)
-    else:
-        categories = None
-
-    game_args = {
-        "images": embeddings,
-        "images_filenames": path_list,
-        "categories": categories
-    }
-
-    for k in ("reward_sender", "reward_receiver", "reward"):
-        if k in experiment_args:
-            game_args[k] = experiment_args[k]
-
-    agent_args = {
-        "input_shapes": [embeddings[0].shape] * n_active_images + [(1,)],
-        "output_size": vocabulary_size,
-        "n_symbols": vocabulary_size,
-    }
-
-    for k in ("sender_type", "n_informed_filters", "embedding_size", "learning_rate", "gibbs_temperature",
-              "loss", "optimizer", "use_bias", "explore", "model_type"):
-        if k in experiment_args:
-            agent_args[k] = experiment_args[k]
-
-    agent_args["explore"] = None
-    agent_args["model_type"] = model_type
-
-    if model_type == "reinforce":
-        agent1 = q_agent.MultiAgentReinforce(name="01", role="sender", **agent_args)
-        agent2 = q_agent.MultiAgentReinforce(name="02", role="receiver", **agent_args)
     else:
         agent1 = q_agent.MultiAgent(name="01", role="sender", **agent_args)
         agent2 = q_agent.MultiAgent(name="02", role="receiver", **agent_args)
@@ -133,32 +56,49 @@ def run_test(model_dir, load_file, save_file, dataset, use_categories, model_typ
         print(f"Loading weights from '{load_filename}' ...")
         agent1.load(f"{load_filename}.01")
         agent2.load(f"{load_filename}.02")
-    else:
-        raise RuntimeError("A load_file is required in test mode")
 
+    game_args = {
+        "images": features,
+        "images_filenames": metadata.get("fnames"),
+        "categories": metadata.get("class_idx")
+    }
+
+    for k in ("reward_sender", "reward_receiver", "reward"):
+        if k in kwargs:
+            game_args[k] = kwargs[k]
     game = Game(**game_args)
 
-    save_filename = os.path.join(model_dir, save_file)
-    res_file = f"{save_filename}.res.csv"
-    with open(res_file, "w") as rf:
-        training.run_test(game, agent1, agent2, rf, n_active_images=n_active_images,
-                          **experiment_args)
+    experiment_args = {
+        "game": game,
+        "agent1": agent1,
+        "agent2": agent2,
+        "n_active_images": n_active_images,
+    }
+    for k in ("n_episodes", "batch_size", "n_active_images", "roles", "show_plot"):
+        if k in kwargs:
+            experiment_args[k] = kwargs[k]
 
-
-def main(experiment_args):
-    mode = experiment_args["mode"]
-    if mode in ("test"):
-        assert experiment_args["load_file"]
-        run_test(**experiment_args)
+    if mode == "test":
+        assert load_file
+        save_filename = os.path.join(model_dir, save_file)
+        res_file = f"{save_filename}.res.csv"
+        with open(res_file, "w") as rf:
+            training.run_test(results_file=rf, **experiment_args)
     elif mode == "train":
-        assert experiment_args["save_file"]
-        if "{TIMESTAMP}" in experiment_args["save_file"]:
-            experiment_args["save_file"] = experiment_args["save_file"].format(TIMESTAMP=TIMESTAMP)
-        run_training(**experiment_args)
+        assert save_file
+        results = None
+        results_summary, learning_curves = training.run_training(**experiment_args)
+        if save_file:
+            print(f"Saving weights to '{save_file}.*' ...")
+            agent1.save(f"{save_file}.01")
+            agent2.save(f"{save_file}.02")
+            learning_curves.to_csv(f"{save_file}.curves.csv")
+        print(results_summary)
+        with open(f"temp.yml", "r") as f:
+            experiment_args = yaml.safe_load(f)
+        experiment_args["load_file"] = save_file
         experiment_args["mode"] = "test"
-        experiment_args["load_file"] = experiment_args["save_file"]
-        filename = experiment_args["save_file"]
-        param_filename = os.path.join(experiment_args["model_dir"], f"{filename}.yaml")
+        param_filename = os.path.join(kwargs["model_dir"], f"{save_file}.yml")
         print(f"Writing parameters to '{param_filename}' ...")
         with open(param_filename, "w") as f:
             yaml.safe_dump(experiment_args, f, indent=4)
@@ -173,4 +113,6 @@ if __name__ == "__main__":
         settings_file = SETTINGS_FILE
     with open(settings_file, "r") as f:
         experiment_args = yaml.safe_load(f)
-    main(experiment_args)
+    with open("temp.yml", "w") as f:
+        yaml.safe_dump(experiment_args, f, indent=4)
+    run(**experiment_args)

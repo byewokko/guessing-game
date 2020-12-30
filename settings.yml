@@ -22,14 +22,8 @@ batch_size: 30
 
 # Path to embedding file
 #dataset: data/mcrae-484x50-vgg19.emb.gz
-dataset: data/imagenet-200x65-vgg19.train.emb.gz
-#dataset: data/imagenet-200x15-vgg19.test-img.emb.gz
-#dataset: data/imagenet-27x80-vgg19.test-ctg.emb.gz
-#dataset: data/esp-10000-vgg19.emb.gz
-#dataset: data/esp-10000-xception.emb.gz
-
-# Number of images to play with (-null- to keep the whole dataset)
-trim_dataset_to_n_images: False
+#dataset: data/imagenet-200x65-vgg19.train.emb.gz
+dataset: data/big/mcrae-wordnet-vgg16.32bit
 
 # Pick images based on categories (generated from the first column in the embedding file)
 use_categories: True
@@ -48,10 +42,6 @@ explore: gibbs
 #explore: none
 #explore: decay
 
-# Gibbs temperature value
-# The temperature layer is omitted if gibbs_temperature is 0
-gibbs_temperature: 10
-
 # Sender type: agnostic or informed
 sender_type: agnostic
 #sender_type: informed
@@ -60,26 +50,23 @@ sender_type: agnostic
 n_informed_filters: 20
 
 # Agent loss function
+# (ignored in REINFORCE algorithm)
 loss: binary_crossentropy
 #loss: categorical_crossentropy
 #loss: mse
 
-#learning_rate: 0.01
+learning_rate: 0.01
 
 # Batch preparation mode
 # - last: only the newest memory entries are selected into the batch
 # - sample: the whole memory is sampled, using the probability distribution below
-#batch_mode: last
-batch_mode: sample
+batch_mode: last
+#batch_mode: sample
 
 # Probability distributions for batch sampling
 # - uniform: all memory entries are given the same probability
 # - linear, quadratic: probability distribution is skewed in favor of the newer memory entries
 memory_sampling_distribution: linear
-
-# Dropout applied after first (embedding) layer
-# (doesn't make difference)
-#dropout: 0
 
 # Sharing experience with both agents
 # Motivation: Player keeps track of his opponent's actions as well to improve his own strategy.
@@ -101,13 +88,14 @@ stop_when_goal_is_passed: False
 # Model type: "old" is the standard model, other options are breaking/in-development
 #model_type: old
 #model_type: new
-#model_type: reinforce
-model_type: reinforce_multi
+model_type: reinforce
 
 # Save training curves in a csv dataframe
 save_learning_curves: False
 
 early_stopping: False
+
+temperature: 10
 
 sender_settings:
   temperature: null
