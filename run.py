@@ -102,6 +102,7 @@ def run(
         print(f"Writing parameters to '{param_filename}' ...")
         with open(param_filename, "w") as f:
             yaml.safe_dump(experiment_args, f, indent=4)
+        return results_summary
     else:
         raise ValueError(f"Invalid mode: '{mode}'")
 
