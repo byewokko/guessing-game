@@ -8,8 +8,6 @@ import yaml
 import sys
 from datetime import datetime
 
-TIMESTAMP = datetime.now().strftime("%y%m%d-%H%M%S")
-
 import training
 from game.game import Game
 from agent import q_agent, reinforce_agent
@@ -28,6 +26,7 @@ def run(
         vocabulary_size,
         model_type,
         **kwargs):
+    TIMESTAMP = datetime.now().strftime("%y%m%d-%H%M%S")
     save_file = save_file.format(TIMESTAMP=TIMESTAMP)
     metadata, features = utils.dataprep.load_emb_pickled(dataset)
 
@@ -74,31 +73,32 @@ def run(
         "agent2": agent2,
         "n_active_images": n_active_images,
     }
-    for k in ("n_episodes", "batch_size", "n_active_images", "roles", "show_plot"):
+    for k in ("n_episodes", "batch_size", "n_active_images", "roles", "show_plot", "early_stopping"):
         if k in kwargs:
             experiment_args[k] = kwargs[k]
 
     if mode == "test":
         assert load_file
-        save_filename = os.path.join(model_dir, save_file)
-        res_file = f"{save_filename}.res.csv"
+        save_path = os.path.join(model_dir, save_file)
+        res_file = f"{save_path}.res.csv"
         with open(res_file, "w") as rf:
             training.run_test(results_file=rf, **experiment_args)
     elif mode == "train":
         assert save_file
+        save_path = os.path.join(model_dir, save_file)
         results = None
         results_summary, learning_curves = training.run_training(**experiment_args)
         if save_file:
-            print(f"Saving weights to '{save_file}.*' ...")
-            agent1.save(f"{save_file}.01")
-            agent2.save(f"{save_file}.02")
-            learning_curves.to_csv(f"{save_file}.curves.csv")
+            print(f"Saving weights to '{save_path}.*' ...")
+            agent1.save(f"{save_path}.01")
+            agent2.save(f"{save_path}.02")
+            learning_curves.to_csv(f"{save_path}.curves.csv")
         print(results_summary)
         with open(f"temp.yml", "r") as f:
             experiment_args = yaml.safe_load(f)
         experiment_args["load_file"] = save_file
         experiment_args["mode"] = "test"
-        param_filename = os.path.join(kwargs["model_dir"], f"{save_file}.yml")
+        param_filename = os.path.join(model_dir, f"{save_file}.yml")
         print(f"Writing parameters to '{param_filename}' ...")
         with open(param_filename, "w") as f:
             yaml.safe_dump(experiment_args, f, indent=4)

@@ -20,7 +20,7 @@ EMBEDDING_SIZE = 50
 VOCABULARY_SIZE = 100
 TEMPERATURE = 10
 SENDER_TYPE = "agnostic"
-LEARNING_RATE = 0.1
+LEARNING_RATE = 0.01
 OPTIMIZER = "adam"
 SHARED_EMBEDDING = False
 ADAPTIVE_TEMPERATURE = False
@@ -55,11 +55,13 @@ def build_sender_model(n_images: int,
                        embedding_size: int,
                        vocabulary_size: int,
                        optimizer: typing.Type[optim.Optimizer] = optimizer_dict["sgd"],
-                       learning_rate: float = None,
+                       learning_rate: float = LEARNING_RATE,
                        sender_type: str = "agnostic",
                        verbose: bool = False,
                        image_embedding_layer: typing.Optional[layers.Layer] = None,
                        **kwargs) -> (models.Model, models.Model):
+    if isinstance(optimizer, str):
+        optimizer = optimizer_dict[optimizer.lower()]
     image_inputs = [layers.Input(shape=input_image_shape, name=f"image_in_{i}", dtype="float32")
                     for i in range(n_images)]
     if not image_embedding_layer:
@@ -116,7 +118,7 @@ def build_sender_model(n_images: int,
 
     model_train = models.Model([*image_inputs, index, temperature_input],
                                y_selected, name="train")
-    model_train.compile(loss=loss, optimizer=optimizer(learning_rate))
+    model_train.compile(loss=loss, optimizer=optimizer(name="optim-sender", learning_rate=learning_rate))
 
     if verbose:
         model_predict.summary()
@@ -130,10 +132,12 @@ def build_receiver_model(n_images: int,
                          embedding_size: int,
                          vocabulary_size: int,
                          optimizer: typing.Type[optim.Optimizer] = optimizer_dict["sgd"],
-                         learning_rate: float = None,
+                         learning_rate: float = LEARNING_RATE,
                          verbose: bool = False,
                          image_embedding_layer: typing.Optional[layers.Layer] = None,
                          **kwargs) -> (models.Model, models.Model):
+    if isinstance(optimizer, str):
+        optimizer = optimizer_dict[optimizer.lower()]
     image_inputs = [layers.Input(shape=input_image_shape, name=f"image_in_{i}", dtype="float32")
                     for i in range(n_images)]
     if not image_embedding_layer:
@@ -167,7 +171,7 @@ def build_receiver_model(n_images: int,
 
     model_train = models.Model([*image_inputs, symbol_input, index, temperature_input],
                                y_selected, name="train")
-    model_train.compile(loss=loss, optimizer=optimizer(learning_rate))
+    model_train.compile(loss=loss, optimizer=optimizer(name="optim-receiver", learning_rate=learning_rate))
 
     if verbose:
         model_predict.summary()

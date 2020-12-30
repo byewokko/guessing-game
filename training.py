@@ -19,6 +19,8 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, n_active_images, 
                  roles="switch", show_plot=True, explore="gibbs", gibbs_temperature=0.01, early_stopping=False,
                  memory_sampling_distribution="linear", shared_experience=False, stop_when_goal_is_passed=False,
                  **kwargs):
+    if early_stopping is True:
+        early_stopping = EARLY_STOPPING_BATCHES
     result_dict = {"goal1_reached": None, "goal2_reached": None}
     learning_curves = []
     if show_plot:
@@ -115,11 +117,12 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, n_active_images, 
                     if success_rate_avg[-1] > early_stopping_max:
                         print("early stopping counter reset")
                         early_stopping_max = success_rate_avg[-1]
-                        early_stopping_counter = EARLY_STOPPING_BATCHES
+                        early_stopping_counter = early_stopping
                     else:
                         early_stopping_counter -= 1
                         if early_stopping_counter < 0:
                             print("EARLY STOPPING")
+                            result_dict["termination"] = f"early stopping: {episode}"
                             break
 
             sendr1_loss.append(agent1.get_last_loss(net_name="sender"))
@@ -199,7 +202,7 @@ def run_training(game, agent1, agent2, n_episodes, batch_size, n_active_images, 
 
 def run_test(game, agent1, agent2, results_file, n_episodes, batch_size, n_active_images,
              roles="switch", show_plot=False, explore=None, gibbs_temperature=0.01, **kwargs):
-    # Set up the logging of results
+    # Set up the logging of results_old
     columns = "sender_name,receiver_name,active_images,target_image,chosen_symbol,chosen_symbol_p,\
     chosen_image,chosen_image_p,chosen_image_index,success".replace(" ", "").split(",")
     results = {k: None for k in columns}
@@ -230,7 +233,7 @@ def run_test(game, agent1, agent2, results_file, n_episodes, batch_size, n_activ
     receiver = agent2
 
     for episode in range(1, n_episodes + 1):
-        # results["episode"] = i
+        # results_old["episode"] = i
         results["sender_name"] = sender.get_active_name()
         results["receiver_name"] = receiver.get_active_name()
         game.reset()

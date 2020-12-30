@@ -11,8 +11,8 @@ load_file: False
 save_file: "{TIMESTAMP}-reinforce"
 
 # Roles mode: switch or fixed
-roles: switch
-#roles: fixed
+#roles: switch
+roles: fixed
 
 # Number of episodes to play in total
 n_episodes: 50000
@@ -55,7 +55,7 @@ loss: binary_crossentropy
 #loss: categorical_crossentropy
 #loss: mse
 
-learning_rate: 0.01
+#learning_rate: 0.01
 
 # Batch preparation mode
 # - last: only the newest memory entries are selected into the batch

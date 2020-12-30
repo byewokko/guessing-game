@@ -1,13 +1,14 @@
 import pandas as pd
 import sys, os
 import yaml
+import csv
 from datetime import datetime
 
 import run
 
 
-QUEUE_FILE = "results/queue6.csv"
-RESULTS_FILE = "results/results6.csv"
+QUEUE_FILE = "settings-reinforce-1.csv"
+RESULTS_FILE = "settings-reinforce-1.results.csv"
 
 
 def main():
@@ -25,14 +26,22 @@ def main():
         results_file = RESULTS_FILE
 
     with open(queue_file) as f:
-        df = pd.read_csv(f)
+        df = pd.read_csv(f, sep=";")
     for i in df.index:
         row = df.iloc[i, :]
-        experiment_args = dict(row)
+        experiment_args = row.to_dict()
         print(experiment_args)
+        for k in experiment_args:
+            if type(experiment_args[k]).__module__ == "numpy":
+                experiment_args[k] = experiment_args[k].item()
         with open("temp.yml", "w") as f:
             yaml.safe_dump(experiment_args, f, indent=4)
-        results_summary = run.run(**experiment_args)
+        # results_summary = run.run(**experiment_args)
+        try:
+            results_summary = run.run(**experiment_args)
+        except Exception as e:
+            print(e)
+            results_summary = {"termination": repr(e)}
         for k, v in results_summary.items():
             row.loc[k] = v
         if not os.path.isfile(results_file):
