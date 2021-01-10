@@ -1,7 +1,7 @@
 import utils
 from utils.set_seed import set_seed
 
-set_seed(0)
+set_seed(1)
 
 import os
 import yaml
@@ -28,7 +28,13 @@ def run(
         **kwargs):
     TIMESTAMP = datetime.now().strftime("%y%m%d-%H%M%S")
     save_file = save_file.format(TIMESTAMP=TIMESTAMP)
-    metadata, features = utils.dataprep.load_emb_pickled(dataset)
+    try:
+        metadata, features = utils.dataprep.load_emb_pickled(dataset)
+        img_filenames = metadata.get("fnames")
+        img_categories = metadata.get("categories")
+    except FileNotFoundError:
+        _, img_filenames, features = load_emb_gz(dataset)
+        img_categories = make_categories(img_filenames)
 
     agent_args = {
         "input_shapes": [features[0].shape] * n_active_images + [(1,)],
@@ -44,8 +50,10 @@ def run(
             agent_args[k] = kwargs[k]
 
     if model_type == "reinforce":
-        agent1 = reinforce_agent.MultiAgent(name="01", role="sender", **agent_args)
-        agent2 = reinforce_agent.MultiAgent(name="02", role="receiver", **agent_args)
+        # agent1 = reinforce_agent.MultiAgent(name="01", role="sender", **agent_args)
+        # agent2 = reinforce_agent.MultiAgent(name="02", role="receiver", **agent_args)
+        agent1 = reinforce_agent.Sender(name="01", **agent_args)
+        agent2 = reinforce_agent.Receiver(name="02", **agent_args)
     else:
         agent1 = q_agent.MultiAgent(name="01", role="sender", **agent_args)
         agent2 = q_agent.MultiAgent(name="02", role="receiver", **agent_args)
@@ -58,8 +66,8 @@ def run(
 
     game_args = {
         "images": features,
-        "images_filenames": metadata.get("fnames"),
-        "categories": metadata.get("class_idx")
+        "images_filenames": img_filenames,
+        "categories": img_categories
     }
 
     for k in ("reward_sender", "reward_receiver", "reward"):

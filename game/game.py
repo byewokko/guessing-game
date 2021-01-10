@@ -37,6 +37,7 @@ class Game:
 
         self.categories = None
         if categories is not None:
+            categories = np.asarray(categories)
             self.categories = np.unique(categories)
             self.categorized_images = {}
             for c in self.categories:

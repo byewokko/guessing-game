@@ -325,6 +325,7 @@ class MultiAgent(Agent):
         assert role in ("sender", "receiver")
         super(MultiAgent, self).__init__(name=name,
                                          role=role)
+        self.name = name
         self.net: typing.Dict[str, typing.Optional[Agent]] = {
             "sender": None,
             "receiver": None
@@ -333,18 +334,31 @@ class MultiAgent(Agent):
         self.reset_memory()
 
     def _build_model(self, shared_embedding, embedding_size, **kwargs):
+        print(f"shared_embedding: {shared_embedding}")
+        for k, v in kwargs.items():
+            print(f"{k}: {v}")
         if shared_embedding:
             image_embedding_layer = layers.Dense(embedding_size, name="shared_image_embedding")
         else:
             image_embedding_layer = None
+
+        sender_update = {}
+        receiver_update = {}
+        if "sender_settings" in kwargs:
+            sender_update = kwargs.pop("sender_settings") or {}
+        if "receiver_settings" in kwargs:
+            receiver_update = kwargs.pop("receiver_settings") or {}
+        sender_update["image_embedding_layer"] = image_embedding_layer
+        receiver_update["image_embedding_layer"] = image_embedding_layer
+        sender_update["embedding_size"] = embedding_size
+        receiver_update["embedding_size"] = embedding_size
+        sender_kwargs = {**kwargs, **sender_update}
+        receiver_kwargs = {**kwargs, **receiver_update}
+
         self.net["sender"] = Agent(name="sender_rf", role="sender")
         self.net["receiver"] = Agent(name="receiver_rf", role="receiver")
-        self.net["sender"].set_model(*build_sender_model(image_embedding_layer=image_embedding_layer,
-                                                         embedding_size=embedding_size,
-                                                         **kwargs))
-        self.net["receiver"].set_model(*build_receiver_model(image_embedding_layer=image_embedding_layer,
-                                                             embedding_size=embedding_size,
-                                                             **kwargs))
+        self.net["sender"].set_model(*build_sender_model(**sender_kwargs))
+        self.net["receiver"].set_model(*build_receiver_model(**receiver_kwargs))
 
     def switch_role(self):
         if self.role == "sender":

@@ -15,15 +15,15 @@ save_file: "{TIMESTAMP}-reinforce"
 roles: fixed
 
 # Number of episodes to play in total
-n_episodes: 50000
+n_episodes: 30000
 
 # Training batch size, also the number of episodes between updates
 batch_size: 30
 
 # Path to embedding file
+dataset: data/imagenet-200x65-vgg19.train.emb.gz
 #dataset: data/mcrae-484x50-vgg19.emb.gz
-#dataset: data/imagenet-200x65-vgg19.train.emb.gz
-dataset: data/big/mcrae-wordnet-vgg16.32bit
+#dataset: data/big/mcrae-wordnet-vgg16.32bit
 
 # Pick images based on categories (generated from the first column in the embedding file)
 use_categories: True
@@ -38,7 +38,7 @@ embedding_size: 50
 n_active_images: 2
 
 # Exploration strategy: none, gibbs or decay
-explore: gibbs
+#explore: gibbs
 #explore: none
 #explore: decay
 
@@ -55,13 +55,14 @@ loss: binary_crossentropy
 #loss: categorical_crossentropy
 #loss: mse
 
-#learning_rate: 0.01
+optimizer: "adam"
+learning_rate: 0.01
 
 # Batch preparation mode
 # - last: only the newest memory entries are selected into the batch
 # - sample: the whole memory is sampled, using the probability distribution below
-batch_mode: last
-#batch_mode: sample
+#batch_mode: last
+batch_mode: sample
 
 # Probability distributions for batch sampling
 # - uniform: all memory entries are given the same probability
@@ -74,8 +75,8 @@ shared_experience: False
 #shared_experience: True
 
 # Share the first, embedding layer between the sender and receiver component within each agent
-#shared_embedding: False
-shared_embedding: True
+shared_embedding: False
+#shared_embedding: True
 
 # Activation function applied to the network output
 #out_activation: sigmoid
@@ -91,21 +92,19 @@ stop_when_goal_is_passed: False
 model_type: reinforce
 
 # Save training curves in a csv dataframe
-save_learning_curves: False
+save_learning_curves: True
 
-early_stopping: False
+early_stopping: True
 
-temperature: 10
+temperature: 30
 
 sender_settings:
-  temperature: null
-  embedding_size: null
-  shared_embedding: null
+#  temperature: null
+#  embedding_size: null
 #  sender_type: informed
   sender_type: agnostic
   n_informed_filters: 20
 
 receiver_settings:
-  temperature: null
-  embedding_size: null
-  shared_embedding: null
+#  temperature: null
+#  embedding_size: null
