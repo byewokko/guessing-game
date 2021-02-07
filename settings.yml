@@ -29,7 +29,7 @@ dataset: data/imagenet-200x65-vgg19.train.emb.gz
 use_categories: True
 
 # Number of symbols that the agents use to communicate
-vocabulary_size: 100
+vocabulary_size: 50
 
 # Size of the first layer in the agents' networks
 embedding_size: 50
@@ -55,14 +55,14 @@ loss: binary_crossentropy
 #loss: categorical_crossentropy
 #loss: mse
 
-optimizer: "adam"
+optimizer: "sgd"
 learning_rate: 0.01
 
 # Batch preparation mode
 # - last: only the newest memory entries are selected into the batch
 # - sample: the whole memory is sampled, using the probability distribution below
-#batch_mode: last
-batch_mode: sample
+batch_mode: last
+#batch_mode: sample
 
 # Probability distributions for batch sampling
 # - uniform: all memory entries are given the same probability
@@ -96,7 +96,7 @@ save_learning_curves: True
 
 early_stopping: True
 
-temperature: 30
+temperature: 10
 
 sender_settings:
 #  temperature: null

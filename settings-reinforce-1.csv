@@ -1,0 +1,17 @@
+mode;model_dir;load_file;save_file;roles;n_episodes;batch_size;dataset;use_categories;vocabulary_size;embedding_size;n_active_images;sender_type;n_informed_filters;optimizer;batch_mode;memory_sampling_distribution;shared_experience;shared_embedding;stop_when_goal_is_passed;model_type;save_learning_curves;early_stopping;temperature
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;100;50;2;agnostic;20;sgd;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;10
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;10;50;2;agnostic;20;sgd;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;10
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;100;50;2;informed;20;sgd;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;10
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;10;50;2;informed;20;sgd;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;10
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;100;50;2;agnostic;20;sgd;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;20
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;10;50;2;agnostic;20;sgd;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;20
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;100;50;2;informed;20;sgd;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;20
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;10;50;2;informed;20;sgd;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;20
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;100;50;2;agnostic;20;adam;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;10
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;10;50;2;agnostic;20;adam;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;10
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;100;50;2;informed;20;adam;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;10
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;10;50;2;informed;20;adam;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;10
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;100;50;2;agnostic;20;adam;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;20
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;10;50;2;agnostic;20;adam;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;20
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;100;50;2;informed;20;adam;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;20
+train;models;FALSE;reinforce-fixed-{TIMESTAMP};fixed;30000;30;data/big/mcrae-wordnet-vgg16.32bit;TRUE;10;50;2;informed;20;adam;last;linear;FALSE;FALSE;FALSE;reinforce;TRUE;TRUE;20
