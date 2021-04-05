@@ -1,0 +1,10 @@
+out_dir: models
+dataset: data/big/mcrae-wordnet-vgg16.32bit
+number_of_episodes: 30000
+batch_size: 30
+number_of_images: 4
+embedding_size: 50
+vocabulary_size: 100
+temperature: 10
+optimizer: adam
+analysis_window: 30

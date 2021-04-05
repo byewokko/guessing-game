@@ -21,9 +21,9 @@ n_episodes: 30000
 batch_size: 30
 
 # Path to embedding file
-dataset: data/imagenet-200x65-vgg19.train.emb.gz
+#dataset: data/imagenet-200x65-vgg19.train.emb.gz
 #dataset: data/mcrae-484x50-vgg19.emb.gz
-#dataset: data/big/mcrae-wordnet-vgg16.32bit
+dataset: data/big/mcrae-wordnet-vgg16.32bit
 
 # Pick images based on categories (generated from the first column in the embedding file)
 use_categories: True
@@ -55,7 +55,7 @@ loss: binary_crossentropy
 #loss: categorical_crossentropy
 #loss: mse
 
-optimizer: "sgd"
+optimizer: "adam"
 learning_rate: 0.01
 
 # Batch preparation mode

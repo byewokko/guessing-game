@@ -1,5 +1,7 @@
 import datetime
 import os
+
+import numpy as np
 import yaml
 import sys
 from collections import OrderedDict
@@ -10,83 +12,200 @@ import tensorflow.keras.optimizers as optim
 import tensorflow.keras
 
 
+class EarlyStopping:
+	def __init__(self, patience, min_episodes=0):
+		self.patience = patience
+		self.min_episodes = min_episodes
+		self.max_score = None
+		self.max_score_ep = None
 
-def dummy():
-	if True or list(map(int, keras.__version__.split("."))) < [2, 4, 0]:
-		import tensorflow.keras.layers as layers
-		import tensorflow.keras.backend as K
-		import tensorflow.keras.optimizers as optim
-		from tensorflow.keras.models import Model, Sequential
-	else:
-		import keras.layers as layers
-		import keras.backend as K
-		import keras.optimizers as optim
-		from keras.models import Model, Sequential
-
-	import matplotlib.pyplot as plt
-	import numpy as np
-	import tensorflow as tf
-
-	from game.game import Game
+	def check(self, episode, score):
+		if episode < self.min_episodes:
+			return False
+		if self.max_score is None or score > self.max_score:
+			print("ES counter reset")
+			self.max_score_ep = episode
+			self.max_score = score
+			return False
+		if episode > self.max_score_ep + self.patience:
+			print("ES stop")
+			return True
 
 
-
-def run_one(settings):
+def run_one(
+		*,
+		out_dir, dataset, number_of_images, embedding_size, vocabulary_size,
+		temperature, number_of_episodes, batch_size, analysis_window, optimizer,
+		**kwargs
+):
 	# TODO: refactor into settings parser
 	# LOAD DATASET
 	from utils.dataprep import load_emb_pickled
-	DATASET = settings.get("dataset")
-	metadata, embeddings = load_emb_pickled(DATASET)
+	metadata, embeddings = load_emb_pickled(dataset)
 	filenames = metadata.get("fnames")
 	categories = metadata.get("categories")
-	IMAGE_SHAPE = [len(embeddings[0])]
+	image_shape = [len(embeddings[0])]
 
-	N_IMAGES = settings.get("number_of_images")
-	EMBEDDING_SIZE = settings.get("embedding_size")
-	VOCABULARY_SIZE = settings.get("vocabulary_size")
+	# CREATE GAME
+	game_settings = {
+		"images": embeddings,
+		"categories": categories,
+		"images_filenames": filenames
+	}
+	from game import Game
+	game = Game(**game_settings)
 
-	TEMPERATURE = settings.get("temperature")
-	N_EPISODES = settings.get("number_of_episodes")
-	ANALYSIS_WINDOW = settings.get("analysis_window")
-	BATCH_SIZE = settings.get("batch_size")
-
-	LEARNING_RATE = 0.1
-	OPTIMIZER = settings.get("optimizer")
+	# SET UP AGENTS
+	learning_rate = 0.1
 	optimizers = {
 		"adam": optim.Adam,
 		"sgd": optim.SGD
 	}
 
-	ADAPTIVE_TEMPERATURE = 0
-
-	SENDER_KWARGS = {
-		"n_images": N_IMAGES,
-		"input_image_shape": IMAGE_SHAPE,
-		"embedding_size": EMBEDDING_SIZE,
-		"vocabulary_size": VOCABULARY_SIZE,
-		"temperature": TEMPERATURE,
-		"optimizer": optimizers[OPTIMIZER](LEARNING_RATE),
+	sender_settings = {
+		"n_images": number_of_images,
+		"input_image_shape": image_shape,
+		"embedding_size": embedding_size,
+		"vocabulary_size": vocabulary_size,
+		"temperature": temperature,
+		"optimizer": optimizers[optimizer](learning_rate),
 		"sender_type": "agnostic",
 		#     "sender_type": "informed",
 		#     "n_informed_filters": 20,
 		"verbose": True
 	}
-
-	RECEIVER_KWARGS = {
-		"n_images": N_IMAGES,
-		"input_image_shape": IMAGE_SHAPE,
-		"embedding_size": EMBEDDING_SIZE,
-		"vocabulary_size": VOCABULARY_SIZE,
-		"temperature": TEMPERATURE,
-		"optimizer": optimizers[OPTIMIZER](LEARNING_RATE),
+	receiver_settings = {
+		"n_images": number_of_images,
+		"input_image_shape": image_shape,
+		"embedding_size": embedding_size,
+		"vocabulary_size": vocabulary_size,
+		"temperature": temperature,
+		"optimizer": optimizers[optimizer](learning_rate),
 	}
 
-	training_data = None
-	return training_data
+	tensorflow.keras.backend.clear_session()
+	from agent.reinforce import Sender, Receiver
+	sender = Sender(**sender_settings)
+	receiver = Receiver(**receiver_settings)
+
+	metrics = "episode images symbol guess success sender_loss receiver_loss".split(" ")
+	dtypes = pd.Int32Dtype(), object, pd.Int32Dtype(), pd.Int32Dtype(), pd.Float64Dtype(), pd.Float64Dtype(), pd.Float64Dtype()
+	training_log = pd.DataFrame(columns=metrics)
+	for column, dtype in zip(metrics, dtypes):
+		training_log[column] = training_log[column].astype(dtype)
+
+	episode = 0
+	early_stopping = EarlyStopping(patience=5000, min_episodes=10000)
+	batch_log = {metric: [] for metric in metrics}
+	while episode < number_of_episodes:
+		batch_log = {metric: [] for metric in metrics}
+		while True:
+			episode += 1
+			game.reset()
+
+			# Sender turn
+			sender_state, img_ids = game.get_sender_state(
+				n_images=number_of_images,
+				unique_categories=True,
+				expand=True,
+				return_ids=True
+			)
+			sender_probs = np.squeeze(sender.predict(
+				state=sender_state
+			))
+			sender_action = np.random.choice(
+				np.arange(len(sender_probs)),
+				p=sender_probs
+			)
+
+			# Receiver turn
+			receiver_state = game.get_receiver_state(
+				sender_action,
+				expand=True
+			)
+			receiver_probs = np.squeeze(receiver.predict(
+				state=receiver_state
+			))
+			receiver_action = np.random.choice(
+				np.arange(len(receiver_probs)),
+				p=receiver_probs
+			)
+
+			# Evaluate turn and remember
+			sender_reward, receiver_reward, success = game.evaluate_guess(receiver_action)
+			sender.remember(
+				state=sender_state,
+				action=np.asarray([sender_action]),
+				target=np.asarray([sender_reward])
+			)
+			receiver.remember(
+				state=receiver_state,
+				action=np.asarray([receiver_action]),
+				target=np.asarray([receiver_reward])
+			)
+
+			batch_log["episode"].append(episode)
+			batch_log["images"].append(img_ids)
+			batch_log["symbol"].append(sender_action)
+			batch_log["guess"].append(receiver_action)
+			batch_log["success"].append(success)
+
+			if episode % batch_size == 0:
+				break
+
+		# Train on batch
+		batch_log["sender_loss"] = sender.update_on_batch()
+		batch_log["receiver_loss"] = receiver.update_on_batch()
+		training_log = training_log.append(pd.DataFrame(batch_log))
+
+		stats = compute_live_stats(
+			training_log=training_log,
+			analysis_window=analysis_window,
+			vocabulary_size=vocabulary_size
+		)
+
+		if early_stopping.check(episode, stats["mean_success"]):
+			break
+	sender.save(os.path.join(out_dir, "sender.weights"))
+	receiver.save(os.path.join(out_dir, "receiver.weights"))
+
+	return training_log
 
 
-def compute_stats(training_data):
+def compute_final_stats(training_data):
 	stats = OrderedDict()
+	return stats
+
+
+def compute_live_stats(training_log: pd.DataFrame, analysis_window, vocabulary_size):
+	LIVE_STATS_MSG = "EP{episode:05d}: \
+	success {success:.3f}, \
+	freq symbols {n_frequent_symbols:3d}, \
+	sender loss: {sender_loss:.3f}, \
+	receiver loss: {receiver_loss:.3f}".replace("\t", "")
+	tail = training_log.tail(analysis_window)
+	episode = tail.iloc[-1]["episode"]
+	stats = {
+		"mean_success": tail["success"].mean(),
+		"mean_sender_loss": tail["sender_loss"].mean(),
+		"mean_receiver_loss": tail["receiver_loss"].mean()
+	}
+	frequent_symbols = tail["symbol"].value_counts(normalize=True)
+	n_frequent_symbols = 0
+	freq_sum = 0
+	for freq in frequent_symbols:
+		n_frequent_symbols += 1
+		freq_sum += freq
+		if freq_sum >= 0.9:
+			break
+	stats["n_frequent_symbols"] = n_frequent_symbols
+	print(LIVE_STATS_MSG.format(
+		episode=episode,
+		success=stats["mean_success"],
+		n_frequent_symbols=stats["n_frequent_symbols"],
+		sender_loss=stats["mean_sender_loss"],
+		receiver_loss=stats["mean_receiver_loss"]
+	))
 	return stats
 
 
@@ -97,12 +216,12 @@ def run_many(settings_list, name):
 		folder = os.path.join("models", f"{name}-{timestamp}")
 		os.makedirs(folder)
 		settings["out_dir"] = folder
-		training_data: pd.DataFrame = run_one(settings)
+		training_data: pd.DataFrame = run_one(**settings)
 		# save training_data to training_data_file
 		training_data_file = os.path.join(folder, "training_data.csv")
 		training_data.to_csv(training_data_file)
 		# compute stats
-		stats = compute_stats(training_data)
+		stats = compute_final_stats(training_data)
 		# append stats to stats_file
 		entry = OrderedDict()
 		entry.update(settings)
@@ -135,12 +254,13 @@ def main(filename):
 		# parse yaml into a settings-dict
 		with open(filename, "r") as f:
 			settings = yaml.load(f)
-		training_data = run_one(settings)
+		training_data = run_one(**settings)
 
 
 if __name__ == "__main__":
 	if len(sys.argv) == 2:
 		filename = sys.argv[1]
 	else:
-		filename = "settings-reinforce-1.csv"
+		# filename = "settings-reinforce-1.csv"
+		filename = "settings-new.yml"
 	main(filename)
