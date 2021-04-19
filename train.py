@@ -34,6 +34,7 @@ def run_one(
 		*,
 		out_dir, dataset, number_of_images, embedding_size, vocabulary_size,
 		temperature, number_of_episodes, batch_size, analysis_window, optimizer,
+		memory_sampling_mode, algorithm,
 		**kwargs
 ):
 	# TODO: refactor into settings parser
@@ -82,12 +83,20 @@ def run_one(
 	}
 
 	tensorflow.keras.backend.clear_session()
-	from agent.reinforce import Sender, Receiver
-	sender = Sender(**sender_settings)
-	receiver = Receiver(**receiver_settings)
+	if algorithm == "reinforce":
+		from agent.reinforce import Sender, Receiver
+		sender = Sender(**sender_settings)
+		receiver = Receiver(**receiver_settings)
+	elif algorithm == "qlearning":
+		from agent.qlearning import Sender, Receiver
+		sender = Sender(**sender_settings)
+		receiver = Receiver(**receiver_settings)
 
 	metrics = "episode images symbol guess success sender_loss receiver_loss".split(" ")
-	dtypes = pd.Int32Dtype(), object, pd.Int32Dtype(), pd.Int32Dtype(), pd.Float64Dtype(), pd.Float64Dtype(), pd.Float64Dtype()
+	dtypes = [
+		pd.Int32Dtype(), object, pd.Int32Dtype(), pd.Int32Dtype(),
+		pd.Float64Dtype(), pd.Float64Dtype(), pd.Float64Dtype()
+	]
 	training_log = pd.DataFrame(columns=metrics)
 	for column, dtype in zip(metrics, dtypes):
 		training_log[column] = training_log[column].astype(dtype)
@@ -159,8 +168,8 @@ def run_one(
 				break
 
 		# Train on batch
-		batch_log["sender_loss"] = sender.update_on_batch()
-		batch_log["receiver_loss"] = receiver.update_on_batch()
+		batch_log["sender_loss"] = sender.update_on_batch(batch_size, memory_sampling_mode=memory_sampling_mode)
+		batch_log["receiver_loss"] = receiver.update_on_batch(batch_size, memory_sampling_mode=memory_sampling_mode)
 		training_log = training_log.append(pd.DataFrame(batch_log))
 
 		stats = compute_live_stats(

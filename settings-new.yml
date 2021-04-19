@@ -8,4 +8,7 @@ vocabulary_size: 100
 temperature: 20
 optimizer: adam
 analysis_window: 30
-sender_type: informed
+sender_type: agnostic
+memory_sampling_mode: last
+algorithm: reinforce
+#algorithm: qlearning
