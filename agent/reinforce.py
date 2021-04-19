@@ -14,7 +14,7 @@ L = logging.getLogger(__name__)
 def build_sender_model(
 		n_images, input_image_shape, embedding_size,
 		vocabulary_size, optimizer,
-		sender_type="agnostic",
+		sender_type="agnostic", image_embedding_layer=None,
 		verbose=False, **kwargs
 ):
 	image_inputs = [
@@ -24,10 +24,12 @@ def build_sender_model(
 			dtype="float32")
 		for i in range(n_images)
 	]
-	image_embedding_layer = layers.Dense(
-		embedding_size,
-		name="S_image_embedding"
-	)
+
+	if not image_embedding_layer:
+		image_embedding_layer = layers.Dense(
+			embedding_size,
+			name="S_image_embedding"
+		)
 	# agnostic part
 	sigmoid = layers.Activation("sigmoid", name="S_sigmoid")
 	output_layer = layers.Dense(vocabulary_size, name="S_output")
@@ -100,14 +102,16 @@ def build_sender_model(
 
 def build_receiver_model(
 		n_images, input_image_shape, embedding_size,
-		vocabulary_size, optimizer, verbose=False, **kwargs
+		vocabulary_size, optimizer, image_embedding_layer=None, verbose=False, **kwargs
 ):
 	image_inputs = [
 		layers.Input(shape=input_image_shape, name=f"R_image_in_{i}", dtype="float32")
 		for i
 		in range(n_images)
 	]
-	image_embedding_layer = layers.Dense(embedding_size, name="R_image_embedding")
+
+	if not image_embedding_layer:
+		image_embedding_layer = layers.Dense(embedding_size, name="R_image_embedding")
 
 	temperature_input = layers.Input(shape=[], dtype="float32", name="R_temperature_input")
 	softmax = layers.Softmax()
