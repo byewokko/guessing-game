@@ -7,7 +7,7 @@ from tensorflow.keras import losses
 from tensorflow.keras import models
 from tensorflow.keras import backend as K
 
-from .agent import Agent
+from .agent import Agent, getshape
 
 L = logging.getLogger(__name__)
 
@@ -114,3 +114,98 @@ def build_receiver_model(
 	model_predict.compile(loss=losses.categorical_crossentropy, optimizer=optimizer)
 
 	return model_predict
+
+
+class QAgent(Agent):
+	def __init__(self, **kwargs):
+		super().__init__(**kwargs)
+		self.max_memory = 2000
+		self.memory_sampling_dist = None
+
+	def predict(self, state):
+		x = state
+		return self.model.predict_on_batch(x)
+
+	def update(self, state, action, target):
+		x = [*state, action]
+		return self.model_train.train_on_batch(x=x, y=target)
+
+	def remember(self, state, action, target):
+		x = [*state, action]
+		self.memory_x.append(x)
+		self.memory_y.append(target)
+
+	def reset_memory(self):
+		self.memory_x = []
+		self.memory_y = []
+
+	def update_on_batch(self, batch_size: int, reset_after=True, **kwargs):
+		loss = []
+		for x, y in zip(self.make_batch(batch_size, kwargs.get("memory_sampling_mode"))):
+			loss.append(self.model_train.train_on_batch(x=x, y=y))
+		if reset_after:
+			self.reset_memory()
+		return loss
+
+	def make_batch(self, batch_size: int, memory_sampling_mode: str = None):
+		self.trim_memory()
+		if memory_sampling_mode in (None, "last"):
+			batch_x = self.memory_x[-batch_size:]
+			batch_y = self.memory_y[-batch_size:]
+		elif memory_sampling_mode in ("uniform", "linear_skew"):
+			batch_x = []
+			batch_y = []
+			if self.memory_sampling_dist is None or len(self.memory_x) != len(self.memory_sampling_dist):
+				self.make_distribution(len(self.memory_x), memory_sampling_mode)
+			indices = np.random.choice(
+				np.arange(len(self.memory_x)),
+				batch_size,
+				p=self.memory_sampling_dist
+			)
+			for i in indices:
+				batch_x.append(self.memory_x[i])
+				batch_y.append(self.memory_y[i])
+		else:
+			raise ValueError(f"Invalid mode: '{memory_sampling_mode}'")
+		return batch_x, batch_y
+
+	def trim_memory(self, length=None):
+		if not length:
+			length = self.max_memory
+		self.memory_x = self.memory_x[-length:]
+		self.memory_y = self.memory_y[-length:]
+
+	def make_distribution(self, size: int, mode: str = None):
+		if not mode or mode == "uniform":
+			self.memory_sampling_dist = np.ones(size) / size
+		elif mode == "linear_skew":
+			d = np.linspace(0, 1, size + 1)[1:]
+			self.memory_sampling_dist = d / d.sum()
+		# elif mode == "quadratic_skew":
+		# 	d = np.linspace(0, 1, size + 1)[1:]
+		# 	d = d * d
+		# 	self.memory_sampling_dist = d / d.sum()
+		else:
+			raise ValueError(f"Invalid mode: '{mode}'")
+
+	def load(self, name: str):
+		self.model.load_weights(name)
+
+	def save(self, name: str):
+		self.model.save_weights(name)
+
+
+class Sender(QAgent):
+	def __init__(self, **kwargs):
+		super().__init__(**kwargs)
+		self.model = build_sender_model(**kwargs)
+		self.model_train = self.model
+		self.reset_memory()
+
+
+class Receiver(QAgent):
+	def __init__(self, **kwargs):
+		super().__init__(**kwargs)
+		self.model = build_receiver_model(**kwargs)
+		self.model_train = self.model
+		self.reset_memory()

@@ -29,7 +29,6 @@ class Agent:
 
 	def update(self, state, action, target):
 		x = [*state, action, np.array(self.temperature)]
-		print(getshape(x), getshape(target))
 		return self.model_train.train_on_batch(x=x, y=target)
 
 	def remember(self, state, action, target):
@@ -41,9 +40,9 @@ class Agent:
 		self.memory_x = []
 		self.memory_y = []
 
-	def update_on_batch(self, reset_after=True):
+	def update_on_batch(self, batch_size: int, reset_after=True, **kwargs):
 		loss = []
-		for x, y in zip(self.memory_x, self.memory_y):
+		for x, y in zip(self.memory_x[-batch_size:], self.memory_y[-batch_size:]):
 			x = [*x, np.array([self.temperature])]
 			loss.append(self.model_train.train_on_batch(x=x, y=y))
 		if reset_after:
