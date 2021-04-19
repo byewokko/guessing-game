@@ -28,3 +28,14 @@ to be used.
 
 Some basic pivot tables and tSNE clustering is available in 
 `Model output analysis.ipynb` notebook.
+
+## TODOs
+
+- [x] refactor train procedure
+- [x] reimplement reinforce agent
+- [ ] reimplement Q-agent
+- [ ] reimplement Compound Agent
+- analysis
+  - [ ] TSNE / the other thing
+  - [ ] symbol purity
+    

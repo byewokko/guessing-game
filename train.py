@@ -23,12 +23,10 @@ class EarlyStopping:
 		if episode < self.min_episodes:
 			return False
 		if self.max_score is None or score > self.max_score:
-			print("ES counter reset")
 			self.max_score_ep = episode
 			self.max_score = score
 			return False
 		if episode > self.max_score_ep + self.patience:
-			print("ES stop")
 			return True
 
 
@@ -150,6 +148,13 @@ def run_one(
 			batch_log["guess"].append(receiver_action)
 			batch_log["success"].append(success)
 
+			if not episode % 500:
+				stats = compute_live_stats(
+					training_log=training_log,
+					analysis_window=500,
+					overwrite_line=False
+				)
+
 			if episode % batch_size == 0:
 				break
 
@@ -160,8 +165,7 @@ def run_one(
 
 		stats = compute_live_stats(
 			training_log=training_log,
-			analysis_window=analysis_window,
-			vocabulary_size=vocabulary_size
+			analysis_window=analysis_window
 		)
 
 		if early_stopping.check(episode, stats["mean_success"]):
@@ -172,13 +176,29 @@ def run_one(
 	return training_log
 
 
-def compute_final_stats(training_data):
-	stats = OrderedDict()
+def compute_final_stats(training_log, analysis_window=None):
+	if not analysis_window:
+		analysis_window = 30
+	final_episode = training_log.iloc[-1]["episode"]
+	tail = training_log.tail(analysis_window)
+	stats = {
+		"final_episode": training_log.iloc[-1]["episode"],
+		"mean_success": tail["success"].mean()
+	}
+	frequent_symbols = tail["symbol"].value_counts(normalize=True)
+	n_frequent_symbols = 0
+	freq_sum = 0
+	for freq in frequent_symbols:
+		n_frequent_symbols += 1
+		freq_sum += freq
+		if freq_sum >= 0.9:
+			break
+	stats["n_frequent_symbols"] = n_frequent_symbols
 	return stats
 
 
-def compute_live_stats(training_log: pd.DataFrame, analysis_window, vocabulary_size):
-	LIVE_STATS_MSG = "EP{episode:05d}: \
+def compute_live_stats(training_log: pd.DataFrame, analysis_window, overwrite_line=True):
+	LIVE_STATS_MSG = "\rEP{episode:05d}: \
 	success {success:.3f}, \
 	freq symbols {n_frequent_symbols:3d}, \
 	sender loss: {sender_loss:.3f}, \
@@ -205,7 +225,9 @@ def compute_live_stats(training_log: pd.DataFrame, analysis_window, vocabulary_s
 		n_frequent_symbols=stats["n_frequent_symbols"],
 		sender_loss=stats["mean_sender_loss"],
 		receiver_loss=stats["mean_receiver_loss"]
-	))
+	), end="")
+	if not overwrite_line:
+		print()
 	return stats
 
 
@@ -216,12 +238,12 @@ def run_many(settings_list, name):
 		folder = os.path.join("models", f"{name}-{timestamp}")
 		os.makedirs(folder)
 		settings["out_dir"] = folder
-		training_data: pd.DataFrame = run_one(**settings)
+		training_log: pd.DataFrame = run_one(**settings)
 		# save training_data to training_data_file
-		training_data_file = os.path.join(folder, "training_data.csv")
-		training_data.to_csv(training_data_file)
+		training_log_file = os.path.join(folder, "training_log.csv")
+		training_log.to_csv(training_log_file)
 		# compute stats
-		stats = compute_final_stats(training_data)
+		stats = compute_final_stats(training_log)
 		# append stats to stats_file
 		entry = OrderedDict()
 		entry.update(settings)
@@ -254,7 +276,13 @@ def main(filename):
 		# parse yaml into a settings-dict
 		with open(filename, "r") as f:
 			settings = yaml.load(f)
-		training_data = run_one(**settings)
+		training_log = run_one(**settings)
+		training_log_file = os.path.join(settings["out_dir"], "training_log.csv")
+		training_log.to_csv(training_log_file)
+		stats = compute_final_stats(training_log)
+		training_stats_file = os.path.join(settings["out_dir"], "training_stats.yml")
+		with open(training_stats_file, "w") as f:
+			yaml.dump(stats, f)
 
 
 if __name__ == "__main__":
