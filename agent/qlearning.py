@@ -74,8 +74,10 @@ def build_sender_model(
 
 	y = output_activation(y)
 
-	model_predict = models.Model([*image_inputs], y, name="S_predict")
+	model_predict = models.Model(image_inputs, y, name="S_predict")
 	model_predict.compile(loss=losses.categorical_crossentropy, optimizer=optimizer)
+
+	# TODO: create model_train???
 
 	return model_predict
 
@@ -121,23 +123,6 @@ class QAgent(Agent):
 		super().__init__(**kwargs)
 		self.max_memory = 2000
 		self.memory_sampling_dist = None
-
-	def predict(self, state):
-		x = state
-		return self.model.predict_on_batch(x)
-
-	def update(self, state, action, target):
-		x = [*state, action]
-		return self.model_train.train_on_batch(x=x, y=target)
-
-	def remember(self, state, action, target):
-		x = [*state, action]
-		self.memory_x.append(x)
-		self.memory_y.append(target)
-
-	def reset_memory(self):
-		self.memory_x = []
-		self.memory_y = []
 
 	def update_on_batch(self, batch_size: int, reset_after=True, **kwargs):
 		loss = []
@@ -187,12 +172,6 @@ class QAgent(Agent):
 		# 	self.memory_sampling_dist = d / d.sum()
 		else:
 			raise ValueError(f"Invalid mode: '{mode}'")
-
-	def load(self, name: str):
-		self.model.load_weights(name)
-
-	def save(self, name: str):
-		self.model.save_weights(name)
 
 
 class Sender(QAgent):

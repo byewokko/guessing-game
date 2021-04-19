@@ -34,6 +34,7 @@ Some basic pivot tables and tSNE clustering is available in
 - [x] refactor train procedure
 - [x] reimplement reinforce agent
 - [ ] reimplement Q-agent
+  - [ ] fix training/predicting input
 - [ ] reimplement Compound Agent
 - analysis
   - [ ] TSNE / the other thing
