@@ -13,7 +13,7 @@ L = logging.getLogger(__name__)
 
 def build_sender_model(
 		n_images, input_image_shape, embedding_size,
-		vocabulary_size, optimizer,
+		vocabulary_size, optimizer, temperature,
 		sender_type="agnostic", image_embedding_layer=None,
 		verbose=False, **kwargs
 ):
@@ -55,8 +55,6 @@ def build_sender_model(
 	)
 	flatten = layers.Flatten()
 
-	temperature_input = layers.Input(shape=[], dtype="float32", name="R_temperature_input")
-
 	softmax = layers.Softmax()
 
 	y = [image_embedding_layer(x) for x in image_inputs]
@@ -72,10 +70,10 @@ def build_sender_model(
 		y = vocabulary_filter(y)
 		y = flatten(y)
 
-	y = y / temperature_input
+	y = y / temperature
 	y = softmax(y)
 
-	model_predict = models.Model([*image_inputs, temperature_input], y, name="S_predict")
+	model_predict = models.Model(image_inputs, y, name="S_predict")
 
 	index = layers.Input(shape=[1], dtype="int32", name="S_index_in")
 	y_selected = layers.Lambda(
@@ -88,7 +86,7 @@ def build_sender_model(
 		return - K.log(prediction) * target
 
 	model_train = models.Model(
-		[*image_inputs, index, temperature_input],
+		[*image_inputs, index],
 		y_selected, name="S_train"
 	)
 	model_train.compile(loss=loss, optimizer=optimizer)
@@ -101,7 +99,7 @@ def build_sender_model(
 
 
 def build_receiver_model(
-		n_images, input_image_shape, embedding_size,
+		n_images, input_image_shape, embedding_size, temperature,
 		vocabulary_size, optimizer, image_embedding_layer=None, verbose=False, **kwargs
 ):
 	image_inputs = [
@@ -113,7 +111,6 @@ def build_receiver_model(
 	if not image_embedding_layer:
 		image_embedding_layer = layers.Dense(embedding_size, name="R_image_embedding")
 
-	temperature_input = layers.Input(shape=[], dtype="float32", name="R_temperature_input")
 	softmax = layers.Softmax()
 
 	symbol_input = layers.Input(shape=[1], dtype="int32", name=f"R_symbol_in")
@@ -128,10 +125,10 @@ def build_receiver_model(
 	y_symbol = symbol_embedding(symbol_input)
 	y = [dot_product([img, y_symbol]) for img in y_images]
 	y = layers.concatenate(y, axis=-1)
-	y = y / temperature_input
+	y = y / temperature
 	y = softmax(y)
 
-	model_predict = models.Model([*image_inputs, symbol_input, temperature_input], y, name="R_predict")
+	model_predict = models.Model([*image_inputs, symbol_input], y, name="R_predict")
 
 	index = layers.Input(shape=[1], dtype="int32", name="R_index_in")
 	y_selected = layers.Lambda(
@@ -144,7 +141,7 @@ def build_receiver_model(
 		return - K.log(prediction) * target
 
 	model_train = models.Model(
-		[*image_inputs, symbol_input, index, temperature_input],
+		[*image_inputs, symbol_input, index],
 		y_selected,
 		name="R_train"
 	)
@@ -158,14 +155,14 @@ def build_receiver_model(
 
 
 class Sender(Agent):
-	def __init__(self, temperature=1, **kwargs):
-		super().__init__(temperature, **kwargs)
+	def __init__(self, **kwargs):
+		super().__init__(**kwargs)
 		self.model, self.model_train = build_sender_model(**kwargs)
 		self.reset_memory()
 
 
 class Receiver(Agent):
-	def __init__(self, temperature=1, **kwargs):
-		super().__init__(temperature, **kwargs)
+	def __init__(self, **kwargs):
+		super().__init__(**kwargs)
 		self.model, self.model_train = build_receiver_model(**kwargs)
 		self.reset_memory()

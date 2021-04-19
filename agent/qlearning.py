@@ -141,7 +141,7 @@ class QAgent(Agent):
 
 	def update_on_batch(self, batch_size: int, reset_after=True, **kwargs):
 		loss = []
-		for x, y in zip(self.make_batch(batch_size, kwargs.get("memory_sampling_mode"))):
+		for x, y in zip(*self.make_batch(batch_size, kwargs.get("memory_sampling_mode"))):
 			loss.append(self.model_train.train_on_batch(x=x, y=y))
 		if reset_after:
 			self.reset_memory()
