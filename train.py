@@ -120,10 +120,7 @@ def run_one(
 			sender_probs = np.squeeze(sender.predict(
 				state=sender_state
 			))
-			sender_action = np.random.choice(
-				np.arange(len(sender_probs)),
-				p=sender_probs
-			)
+			sender_action = sender.choose_action(sender_probs)
 
 			# Receiver turn
 			receiver_state = game.get_receiver_state(
@@ -133,10 +130,7 @@ def run_one(
 			receiver_probs = np.squeeze(receiver.predict(
 				state=receiver_state
 			))
-			receiver_action = np.random.choice(
-				np.arange(len(receiver_probs)),
-				p=receiver_probs
-			)
+			receiver_action = receiver.choose_action(receiver_probs)
 
 			# Evaluate turn and remember
 			sender_reward, receiver_reward, success = game.evaluate_guess(receiver_action)
@@ -145,6 +139,7 @@ def run_one(
 				action=np.asarray([sender_action]),
 				target=np.asarray([sender_reward])
 			)
+			print(np.asarray([sender_action]), np.asarray([receiver_action]), np.asarray([sender_reward]))
 			receiver.remember(
 				state=receiver_state,
 				action=np.asarray([receiver_action]),

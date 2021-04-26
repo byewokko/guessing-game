@@ -12,8 +12,8 @@ analysis_window: 30
 sender_type: agnostic
 #sender_type: informed
 
-#memory_sampling_mode: last
-memory_sampling_mode: uniform
+memory_sampling_mode: last
+#memory_sampling_mode: uniform
 #memory_sampling_mode: linear_skew
 
 #algorithm: reinforce

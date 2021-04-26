@@ -124,9 +124,13 @@ class QAgent(Agent):
 		self.max_memory = 2000
 		self.memory_sampling_dist = None
 
+	def choose_action(self, probs):
+		return np.argmax(probs)
+
 	def update_on_batch(self, batch_size: int, reset_after=True, **kwargs):
 		loss = []
-		for x, y in zip(*self.make_batch(batch_size, kwargs.get("memory_sampling_mode"))):
+		batch = self.make_batch(batch_size, kwargs.get("memory_sampling_mode"))
+		for x, y in zip(*batch):
 			loss.append(self.model_train.train_on_batch(x=x, y=y))
 		if reset_after:
 			self.reset_memory()

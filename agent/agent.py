@@ -26,6 +26,12 @@ class Agent:
 		x = state
 		return self.model.predict_on_batch(x)
 
+	def choose_action(self, probs):
+		return np.random.choice(
+			np.arange(len(probs)),
+			p=probs
+		)
+
 	def update(self, state, action, target):
 		x = [*state, action]
 		return self.model_train.train_on_batch(x=x, y=target)
