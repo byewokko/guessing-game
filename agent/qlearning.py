@@ -75,11 +75,23 @@ def build_sender_model(
 	y = output_activation(y)
 
 	model_predict = models.Model(image_inputs, y, name="S_predict")
-	model_predict.compile(loss=losses.categorical_crossentropy, optimizer=optimizer)
 
-	# TODO: create model_train???
+	index = layers.Input(shape=[1], dtype="int32", name="S_index_in")
+	y_selected = layers.Lambda(
+		lambda probs_index: K.gather(probs_index[0][0], probs_index[1]),
+		name="S_gather"
+	)([y, index])
 
-	return model_predict
+	model_train = models.Model(
+		[*image_inputs, index],
+		y_selected, name="S_train"
+	)
+	model_train.compile(loss=losses.binary_crossentropy, optimizer=optimizer)
+
+	if verbose:
+		model_train.summary()
+
+	return model_predict, model_train
 
 
 def build_receiver_model(
@@ -113,9 +125,24 @@ def build_receiver_model(
 	y = output_activation(y)
 
 	model_predict = models.Model([*image_inputs, symbol_input], y, name="R_predict")
-	model_predict.compile(loss=losses.categorical_crossentropy, optimizer=optimizer)
 
-	return model_predict
+	index = layers.Input(shape=[1], dtype="int32", name="R_index_in")
+	y_selected = layers.Lambda(
+		lambda probs_index: tf.gather(*probs_index, axis=-1),
+		name="R_gather"
+	)([y, index])
+
+	model_train = models.Model(
+		[*image_inputs, symbol_input, index],
+		y_selected,
+		name="R_train"
+	)
+	model_train.compile(loss=losses.binary_crossentropy, optimizer=optimizer)
+
+	if verbose:
+		model_train.summary()
+
+	return model_predict, model_train
 
 
 class QAgent(Agent):
@@ -181,14 +208,12 @@ class QAgent(Agent):
 class Sender(QAgent):
 	def __init__(self, **kwargs):
 		super().__init__(**kwargs)
-		self.model = build_sender_model(**kwargs)
-		self.model_train = self.model
+		self.model, self.model_train = build_sender_model(**kwargs)
 		self.reset_memory()
 
 
 class Receiver(QAgent):
 	def __init__(self, **kwargs):
 		super().__init__(**kwargs)
-		self.model = build_receiver_model(**kwargs)
-		self.model_train = self.model
+		self.model, self.model_train = build_receiver_model(**kwargs)
 		self.reset_memory()

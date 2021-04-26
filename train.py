@@ -139,7 +139,7 @@ def run_one(
 				action=np.asarray([sender_action]),
 				target=np.asarray([sender_reward])
 			)
-			print(np.asarray([sender_action]), np.asarray([receiver_action]), np.asarray([sender_reward]))
+			# print(np.asarray([sender_action]), np.asarray([receiver_action]), np.asarray([sender_reward]))
 			receiver.remember(
 				state=receiver_state,
 				action=np.asarray([receiver_action]),
