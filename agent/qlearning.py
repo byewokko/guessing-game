@@ -126,6 +126,7 @@ def build_receiver_model(
 
 	model_predict = models.Model([*image_inputs, symbol_input], y, name="R_predict")
 
+	# TODO: remove output masking
 	index = layers.Input(shape=[1], dtype="int32", name="R_index_in")
 	y_selected = layers.Lambda(
 		lambda probs_index: tf.gather(*probs_index, axis=-1),
@@ -148,7 +149,7 @@ def build_receiver_model(
 class QAgent(Agent):
 	def __init__(self, **kwargs):
 		super().__init__(**kwargs)
-		self.max_memory = 2000
+		self.max_memory = 5000
 		self.memory_sampling_dist = None
 
 	def choose_action(self, probs):
