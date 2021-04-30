@@ -137,13 +137,15 @@ def run_one(
 			sender.remember(
 				state=sender_state,
 				action=np.asarray([sender_action]),
-				target=np.asarray([sender_reward])
+				action_probs=sender_probs,
+				reward=np.asarray([sender_reward])
 			)
 			# print(np.asarray([sender_action]), np.asarray([receiver_action]), np.asarray([sender_reward]))
 			receiver.remember(
 				state=receiver_state,
 				action=np.asarray([receiver_action]),
-				target=np.asarray([receiver_reward])
+				action_probs=receiver_probs,
+				reward=np.asarray([receiver_reward])
 			)
 
 			batch_log["episode"].append(episode)

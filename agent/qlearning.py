@@ -75,23 +75,12 @@ def build_sender_model(
 	y = output_activation(y)
 
 	model_predict = models.Model(image_inputs, y, name="S_predict")
-
-	index = layers.Input(shape=[1], dtype="int32", name="S_index_in")
-	y_selected = layers.Lambda(
-		lambda probs_index: K.gather(probs_index[0][0], probs_index[1]),
-		name="S_gather"
-	)([y, index])
-
-	model_train = models.Model(
-		[*image_inputs, index],
-		y_selected, name="S_train"
-	)
-	model_train.compile(loss=losses.binary_crossentropy, optimizer=optimizer)
+	model_predict.compile(loss=losses.categorical_crossentropy, optimizer=optimizer)
 
 	if verbose:
-		model_train.summary()
+		model_predict.summary()
 
-	return model_predict, model_train
+	return model_predict, model_predict
 
 
 def build_receiver_model(
@@ -125,25 +114,12 @@ def build_receiver_model(
 	y = output_activation(y)
 
 	model_predict = models.Model([*image_inputs, symbol_input], y, name="R_predict")
-
-	# TODO: remove output masking
-	index = layers.Input(shape=[1], dtype="int32", name="R_index_in")
-	y_selected = layers.Lambda(
-		lambda probs_index: tf.gather(*probs_index, axis=-1),
-		name="R_gather"
-	)([y, index])
-
-	model_train = models.Model(
-		[*image_inputs, symbol_input, index],
-		y_selected,
-		name="R_train"
-	)
-	model_train.compile(loss=losses.binary_crossentropy, optimizer=optimizer)
+	model_predict.compile(loss=losses.categorical_crossentropy, optimizer=optimizer)
 
 	if verbose:
-		model_train.summary()
+		model_predict.summary()
 
-	return model_predict, model_train
+	return model_predict, model_predict
 
 
 class QAgent(Agent):
@@ -154,6 +130,12 @@ class QAgent(Agent):
 
 	def choose_action(self, probs):
 		return np.argmax(probs)
+
+	def remember(self, state, action, action_probs, reward):
+		y = action_probs
+		y[action] = reward
+		self.memory_x.append(state)
+		self.memory_y.append(reward)
 
 	def update_on_batch(self, batch_size: int, reset_after=True, **kwargs):
 		loss = []

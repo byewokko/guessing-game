@@ -36,10 +36,10 @@ class Agent:
 		x = [*state, action]
 		return self.model_train.train_on_batch(x=x, y=target)
 
-	def remember(self, state, action, target):
+	def remember(self, state, action, action_probs, reward):
 		x = [*state, action]
 		self.memory_x.append(x)
-		self.memory_y.append(target)
+		self.memory_y.append(reward)
 
 	def reset_memory(self):
 		self.memory_x = []
