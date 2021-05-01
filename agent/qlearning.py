@@ -139,7 +139,7 @@ class QAgent(Agent):
 		self.memory_sampling_dist = None
 
 	def choose_action(self, probs):
-		if random.random < self.exploration_rate:
+		if random.random() < self.exploration_rate:
 			action = random.randrange(0, len(probs))
 		else:
 			action = np.argmax(probs)
