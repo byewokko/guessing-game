@@ -57,7 +57,8 @@ def build_sender_model(
 	)
 	flatten = layers.Flatten()
 
-	output_activation = layers.Softmax()
+	# output_activation = layers.Softmax()
+	output_activation = layers.Activation("sigmoid")
 
 	y = [image_embedding_layer(x) for x in image_inputs]
 	if sender_type == "agnostic":
@@ -75,7 +76,7 @@ def build_sender_model(
 	y = output_activation(y)
 
 	model_predict = models.Model(image_inputs, y, name="S_predict")
-	model_predict.compile(loss=losses.categorical_crossentropy, optimizer=optimizer)
+	model_predict.compile(loss=losses.binary_crossentropy, optimizer=optimizer)
 
 	if verbose:
 		model_predict.summary()
@@ -96,7 +97,8 @@ def build_receiver_model(
 	if not image_embedding_layer:
 		image_embedding_layer = layers.Dense(embedding_size, name="R_image_embedding")
 
-	output_activation = layers.Softmax()
+	# output_activation = layers.Softmax()
+	output_activation = layers.Activation("sigmoid")
 
 	symbol_input = layers.Input(shape=[1], dtype="int32", name=f"R_symbol_in")
 	symbol_embedding = layers.Embedding(
@@ -114,7 +116,7 @@ def build_receiver_model(
 	y = output_activation(y)
 
 	model_predict = models.Model([*image_inputs, symbol_input], y, name="R_predict")
-	model_predict.compile(loss=losses.categorical_crossentropy, optimizer=optimizer)
+	model_predict.compile(loss=losses.binary_crossentropy, optimizer=optimizer)
 
 	if verbose:
 		model_predict.summary()
@@ -135,15 +137,15 @@ class QAgent(Agent):
 		y = action_probs
 		y[action] = reward
 		self.memory_x.append(state)
-		self.memory_y.append(reward)
+		self.memory_y.append(np.expand_dims(y, 0))
 
 	def update_on_batch(self, batch_size: int, reset_after=True, **kwargs):
 		loss = []
 		batch = self.make_batch(batch_size, kwargs.get("memory_sampling_mode"))
 		for x, y in zip(*batch):
 			loss.append(self.model_train.train_on_batch(x=x, y=y))
-		if reset_after:
-			self.reset_memory()
+		# if reset_after:
+		# 	self.reset_memory()
 		return loss
 
 	def make_batch(self, batch_size: int, memory_sampling_mode: str = None):
