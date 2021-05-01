@@ -12,9 +12,16 @@ analysis_window: 30
 sender_type: agnostic
 #sender_type: informed
 
+#algorithm: reinforce
+algorithm: qlearning
+
+# Q Learning settings
+max_memory: 5000
+
 #memory_sampling_mode: last
 #memory_sampling_mode: uniform
 memory_sampling_mode: linear_skew
 
-#algorithm: reinforce
-algorithm: qlearning
+exploration_start: 1
+exploration_decay: 0.995
+exploration_floor: 0.01

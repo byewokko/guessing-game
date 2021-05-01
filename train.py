@@ -32,9 +32,10 @@ class EarlyStopping:
 
 def run_one(
 		*,
-		out_dir, dataset, number_of_images, embedding_size, vocabulary_size,
+		out_dir, dataset, number_of_images, embedding_size, vocabulary_size, sender_type,
 		temperature, number_of_episodes, batch_size, analysis_window, optimizer,
-		memory_sampling_mode, algorithm,
+		memory_sampling_mode, algorithm, max_memory,
+		exploration_start, exploration_decay, exploration_floor,
 		**kwargs
 ):
 	# TODO: refactor into settings parser
@@ -68,10 +69,13 @@ def run_one(
 		"vocabulary_size": vocabulary_size,
 		"temperature": temperature,
 		"optimizer": optimizers[optimizer](learning_rate),
-		"sender_type": "agnostic",
+		"sender_type": sender_type,
 		#     "sender_type": "informed",
 		#     "n_informed_filters": 20,
-		"verbose": True
+		"max_memory": max_memory,
+		"exploration_start": exploration_start,
+		"exploration_decay": exploration_decay,
+		"exploration_floor": exploration_floor
 	}
 	receiver_settings = {
 		"n_images": number_of_images,
@@ -80,6 +84,10 @@ def run_one(
 		"vocabulary_size": vocabulary_size,
 		"temperature": temperature,
 		"optimizer": optimizers[optimizer](learning_rate),
+		"max_memory": max_memory,
+		"exploration_start": exploration_start,
+		"exploration_decay": exploration_decay,
+		"exploration_floor": exploration_floor,
 	}
 
 	tensorflow.keras.backend.clear_session()

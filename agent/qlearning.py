@@ -1,4 +1,6 @@
 import logging
+import random
+
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -125,13 +127,25 @@ def build_receiver_model(
 
 
 class QAgent(Agent):
-	def __init__(self, **kwargs):
+	def __init__(
+			self, max_memory, exploration_start, exploration_decay, exploration_floor,
+			**kwargs
+	):
 		super().__init__(**kwargs)
-		self.max_memory = 5000
+		self.max_memory = max_memory
+		self.exploration_rate = exploration_start
+		self.exploration_decay = exploration_decay
+		self.exploration_floor = exploration_floor
 		self.memory_sampling_dist = None
 
 	def choose_action(self, probs):
-		return np.argmax(probs)
+		if random.random < self.exploration_rate:
+			action = random.randrange(0, len(probs))
+		else:
+			action = np.argmax(probs)
+		if self.exploration_rate > self.exploration_floor:
+			self.exploration_rate *= self.exploration_decay
+		return action
 
 	def remember(self, state, action, action_probs, reward):
 		y = action_probs
