@@ -59,8 +59,8 @@ def build_sender_model(
 
 	y = [image_embedding_layer(x) for x in image_inputs]
 	if sender_type == "agnostic":
-		y = [sigmoid(x) for x in y]
 		y = layers.concatenate(y, axis=-1)
+		y = sigmoid(y)
 		y = output_layer(y)
 	elif sender_type == "informed":
 		y = stack(y)
@@ -166,3 +166,41 @@ class Receiver(Agent):
 		super().__init__(**kwargs)
 		self.model, self.model_train = build_receiver_model(**kwargs)
 		self.reset_memory()
+
+
+class MultiAgent(Agent):
+	# TODO: finish this!!
+	def __init__(self, active_role, **kwargs):
+		super().__init__(**kwargs)
+		self.components = {
+			"sender": Sender(**kwargs),
+			"receiver": Receiver(**kwargs)
+		}
+		self.active_role = active_role
+
+	def predict(self, state):
+		return self.components[self.active_role].predict(state)
+
+	def choose_action(self, probs):
+		return self.components[self.active_role].choose_action(probs)
+
+	def update(self, state, action, target):
+		return self.components[self.active_role].update(state, action, target)
+
+	def remember(self, state, action, action_probs, reward):
+		return self.components[self.active_role].remember(state, action, action_probs, reward)
+
+	def reset_memory(self):
+		self.components["sender"].reset_memory()
+		self.components["receiver"].reset_memory()
+
+	def update_on_batch(self, batch_size: int, reset_after=True, **kwargs):
+		return self.components[self.active_role].update_on_batch(batch_size, reset_after, **kwargs)
+
+	def load(self, name: str):
+		self.components["sender"].load(f"{name}.snd")
+		self.components["receiver"].load(f"{name}.rcv")
+
+	def save(self, name: str):
+		self.components["sender"].save(f"{name}.snd")
+		self.components["receiver"].save(f"{name}.rcv")

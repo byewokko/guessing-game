@@ -59,13 +59,10 @@ def build_sender_model(
 	)
 	flatten = layers.Flatten()
 
-	# output_activation = layers.Softmax()
-	output_activation = layers.Activation("sigmoid")
-
 	y = [image_embedding_layer(x) for x in image_inputs]
 	if sender_type == "agnostic":
-		y = [sigmoid(x) for x in y]
 		y = layers.concatenate(y, axis=-1)
+		y = layers.Activation("sigmoid")(y)
 		y = output_layer(y)
 	elif sender_type == "informed":
 		y = stack(y)
@@ -75,10 +72,10 @@ def build_sender_model(
 		y = vocabulary_filter(y)
 		y = flatten(y)
 
-	y = output_activation(y)
+	y = layers.Activation("softmax")(y)
 
 	model_predict = models.Model(image_inputs, y, name="S_predict")
-	model_predict.compile(loss=losses.binary_crossentropy, optimizer=optimizer)
+	model_predict.compile(loss=losses.categorical_crossentropy, optimizer=optimizer)
 
 	if verbose:
 		model_predict.summary()
@@ -99,9 +96,6 @@ def build_receiver_model(
 	if not image_embedding_layer:
 		image_embedding_layer = layers.Dense(embedding_size, name="R_image_embedding")
 
-	# output_activation = layers.Softmax()
-	output_activation = layers.Activation("sigmoid")
-
 	symbol_input = layers.Input(shape=[1], dtype="int32", name=f"R_symbol_in")
 	symbol_embedding = layers.Embedding(
 		input_dim=vocabulary_size,
@@ -115,10 +109,10 @@ def build_receiver_model(
 	y_symbol = symbol_embedding(symbol_input)
 	y = [dot_product([img, y_symbol]) for img in y_images]
 	y = layers.concatenate(y, axis=-1)
-	y = output_activation(y)
+	y = layers.Activation("softmax")(y)
 
 	model_predict = models.Model([*image_inputs, symbol_input], y, name="R_predict")
-	model_predict.compile(loss=losses.binary_crossentropy, optimizer=optimizer)
+	model_predict.compile(loss=losses.categorical_crossentropy, optimizer=optimizer)
 
 	if verbose:
 		model_predict.summary()

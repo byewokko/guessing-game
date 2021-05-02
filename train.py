@@ -36,6 +36,7 @@ def run_one(
 		temperature, number_of_episodes, batch_size, analysis_window, optimizer,
 		memory_sampling_mode, algorithm, max_memory,
 		exploration_start, exploration_decay, exploration_floor,
+		early_stopping_patience, early_stopping_minimum,
 		**kwargs
 ):
 	# TODO: refactor into settings parser
@@ -110,7 +111,10 @@ def run_one(
 		training_log[column] = training_log[column].astype(dtype)
 
 	episode = 0
-	early_stopping = EarlyStopping(patience=5000, min_episodes=10000)
+	early_stopping = EarlyStopping(
+		patience=early_stopping_patience,
+		min_episodes=early_stopping_minimum
+	)
 	batch_log = {metric: [] for metric in metrics}
 	while episode < number_of_episodes:
 		batch_log = {metric: [] for metric in metrics}

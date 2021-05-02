@@ -4,10 +4,11 @@ number_of_episodes: 30000
 batch_size: 30
 number_of_images: 2
 embedding_size: 50
-vocabulary_size: 100
-temperature: 20
+vocabulary_size: 50
 optimizer: adam
 analysis_window: 30
+early_stopping_patience: 5000
+early_stopping_minimum: 15000
 
 sender_type: agnostic
 #sender_type: informed
@@ -15,12 +16,17 @@ sender_type: agnostic
 #algorithm: reinforce
 algorithm: qlearning
 
+#############
+# REINFORCE settings
+temperature: 10
+
+#############
 # Q Learning settings
 max_memory: 5000
 
-#memory_sampling_mode: last
+memory_sampling_mode: last
 #memory_sampling_mode: uniform
-memory_sampling_mode: linear_skew
+#memory_sampling_mode: linear_skew
 
 exploration_start: 1
 exploration_decay: 0.995
