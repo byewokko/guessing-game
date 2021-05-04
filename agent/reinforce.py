@@ -6,7 +6,7 @@ from tensorflow.keras import optimizers
 from tensorflow.keras import models
 from tensorflow.keras import backend as K
 
-from .agent import Agent
+from . import agent
 
 L = logging.getLogger(__name__)
 
@@ -154,29 +154,36 @@ def build_receiver_model(
 	return model_predict, model_train
 
 
-class Sender(Agent):
+class Sender(agent.Agent):
 	def __init__(self, **kwargs):
 		super().__init__(**kwargs)
 		self.model, self.model_train = build_sender_model(**kwargs)
 		self.reset_memory()
 
 
-class Receiver(Agent):
+class Receiver(agent.Agent):
 	def __init__(self, **kwargs):
 		super().__init__(**kwargs)
 		self.model, self.model_train = build_receiver_model(**kwargs)
 		self.reset_memory()
 
 
-class MultiAgent(Agent):
-	# TODO: finish this!!
+class MultiAgent(agent.MultiAgent):
 	def __init__(self, active_role, **kwargs):
-		super().__init__(**kwargs)
+		super().__init__(active_role, **kwargs)
 		self.components = {
 			"sender": Sender(**kwargs),
 			"receiver": Receiver(**kwargs)
 		}
+		if active_role not in ("sender", "receiver"):
+			raise ValueError(f"Role must be either 'sender' or 'receiver', not '{active_role}'.")
 		self.active_role = active_role
+
+	def switch_role(self):
+		if self.active_role == "sender":
+			self.active_role = "receiver"
+		else:
+			self.active_role = "sender"
 
 	def predict(self, state):
 		return self.components[self.active_role].predict(state)

@@ -10,11 +10,14 @@ analysis_window: 30
 early_stopping_patience: 5000
 early_stopping_minimum: 15000
 
+#role_mode: static
+role_mode: switch
+
 sender_type: agnostic
 #sender_type: informed
 
-#algorithm: reinforce
-algorithm: qlearning
+algorithm: reinforce
+#algorithm: qlearning
 
 #############
 # REINFORCE settings

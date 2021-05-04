@@ -9,7 +9,7 @@ from tensorflow.keras import losses
 from tensorflow.keras import models
 from tensorflow.keras import backend as K
 
-from .agent import Agent, getshape
+from . import agent
 
 L = logging.getLogger(__name__)
 
@@ -120,7 +120,7 @@ def build_receiver_model(
 	return model_predict, model_predict
 
 
-class QAgent(Agent):
+class QAgent(agent.Agent):
 	def __init__(
 			self, max_memory, exploration_start, exploration_decay, exploration_floor,
 			**kwargs
@@ -210,3 +210,9 @@ class Receiver(QAgent):
 		super().__init__(**kwargs)
 		self.model, self.model_train = build_receiver_model(**kwargs)
 		self.reset_memory()
+
+
+class MultiAgent(agent.MultiAgent):
+	def __init__(self, active_role, **kwargs):
+		super().__init__(active_role, **kwargs)
+		raise NotImplementedError()

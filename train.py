@@ -37,6 +37,7 @@ def run_one(
 		memory_sampling_mode, algorithm, max_memory,
 		exploration_start, exploration_decay, exploration_floor,
 		early_stopping_patience, early_stopping_minimum,
+		role_mode,
 		**kwargs
 ):
 	# TODO: refactor into settings parser
@@ -93,13 +94,20 @@ def run_one(
 
 	tensorflow.keras.backend.clear_session()
 	if algorithm == "reinforce":
-		from agent.reinforce import Sender, Receiver
-		sender = Sender(**sender_settings)
-		receiver = Receiver(**receiver_settings)
+		from agent.reinforce import Sender, Receiver, MultiAgent
 	elif algorithm == "qlearning":
-		from agent.qlearning import Sender, Receiver
+		from agent.qlearning import Sender, Receiver, MultiAgent
+	else:
+		raise ValueError(f"Expected 'reinforce' or 'qlearning' algorithm, got '{algorithm}'")
+
+	if role_mode == "switch":
+		sender = MultiAgent(active_role="sender", **sender_settings)
+		receiver = MultiAgent(active_role="sender", **receiver_settings)
+	elif role_mode == "static":
 		sender = Sender(**sender_settings)
 		receiver = Receiver(**receiver_settings)
+	else:
+		raise ValueError(f"Role mode must be either 'static' or 'switch', not '{role_mode}'")
 
 	metrics = "episode images symbol guess success sender_loss receiver_loss".split(" ")
 	dtypes = [
@@ -160,6 +168,7 @@ def run_one(
 				reward=np.asarray([receiver_reward])
 			)
 
+			# TODO: MULTIAGENT logging and stats
 			batch_log["episode"].append(episode)
 			batch_log["images"].append(img_ids)
 			batch_log["symbol"].append(sender_action)
@@ -185,6 +194,10 @@ def run_one(
 			training_log=training_log,
 			analysis_window=analysis_window
 		)
+
+		if role_mode == "switch":
+			Sender.switch_role()
+			Receiver.switch_role()
 
 		if early_stopping.check(episode, stats["mean_success"]):
 			break

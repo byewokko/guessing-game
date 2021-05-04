@@ -58,3 +58,17 @@ class Agent:
 
 	def save(self, name: str):
 		self.model.save_weights(name)
+
+
+class MultiAgent(Agent):
+	def __init__(self, active_role, **kwargs):
+		self.components = {}
+		if active_role not in ("sender", "receiver"):
+			raise ValueError(f"Role must be either 'sender' or 'receiver', not '{active_role}'.")
+		self.active_role = active_role
+
+	def switch_role(self):
+		if self.active_role == "sender":
+			self.active_role = "receiver"
+		else:
+			self.active_role = "sender"
