@@ -215,8 +215,8 @@ def run_one(
 
 		if early_stopping.check(episode, stats["mean_success"]):
 			break
-	sender.save(os.path.join(out_dir, "sender.weights"))
-	receiver.save(os.path.join(out_dir, "receiver.weights"))
+	agent1.save(os.path.join(out_dir, "agent1"))
+	agent2.save(os.path.join(out_dir, "agent2"))
 
 	return training_log
 
@@ -276,15 +276,17 @@ def compute_live_stats(training_log: pd.DataFrame, analysis_window, overwrite_li
 	return stats
 
 
-def run_many(settings_list, name):
+def run_many(settings_list, name, base_settings=None):
 	stats_file = f"{name}.stats.csv"
 	for settings in settings_list:
+		actual_settings = base_settings.copy()
+		actual_settings.update(settings)
 		try:
 			timestamp = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
 			folder = os.path.join("models", f"{name}-{timestamp}")
 			os.makedirs(folder)
-			settings["out_dir"] = folder
-			training_log: pd.DataFrame = run_one(**settings)
+			actual_settings["out_dir"] = folder
+			training_log: pd.DataFrame = run_one(**actual_settings)
 			# save training_data to training_data_file
 			training_log_file = os.path.join(folder, "training_log.csv")
 			training_log.to_csv(training_log_file)
@@ -292,7 +294,7 @@ def run_many(settings_list, name):
 			stats = compute_final_stats(training_log)
 			# append stats to stats_file
 			entry = OrderedDict()
-			entry.update(settings)
+			entry.update(actual_settings)
 			entry.update(stats)
 			# create header if stats_file is not initzd
 			if not os.path.isfile(stats_file):
@@ -304,12 +306,14 @@ def run_many(settings_list, name):
 			print(e)
 
 
-def main(filename):
-	if filename.endswith(".csv"):
+def main(basic_config_file, batch_config_file):
+	with open(basic_config_file, "r") as f:
+		base_settings = yaml.load(f)
+	if batch_config_file:
 		# RUN MANY
 		# parse csv into a list of settings-dicts
 		import messytables
-		with open(filename, "rb") as f:
+		with open(batch_config_file, "rb") as f:
 			row_set = messytables.CSVRowSet("", f)
 			offset, headers = messytables.headers_guess(row_set.sample)
 			row_set.register_processor(messytables.headers_processor(headers))
@@ -317,26 +321,26 @@ def main(filename):
 			types = messytables.type_guess(row_set.sample, strict=True)
 			row_set.register_processor(messytables.types_processor(types))
 			settings_list = row_set.dicts()
-		name = filename.replace(".csv", "")
-		run_many(settings_list, name)
+		name = batch_config_file.replace(".csv", "")
+		run_many(settings_list, name, base_settings=base_settings)
 	else:
 		# RUN ONE
 		# parse yaml into a settings-dict
-		with open(filename, "r") as f:
-			settings = yaml.load(f)
-		training_log = run_one(**settings)
-		training_log_file = os.path.join(settings["out_dir"], "training_log.csv")
+		training_log = run_one(**base_settings)
+		training_log_file = os.path.join(base_settings["out_dir"], "training_log.csv")
 		training_log.to_csv(training_log_file)
 		stats = compute_final_stats(training_log)
-		training_stats_file = os.path.join(settings["out_dir"], "training_stats.yml")
+		training_stats_file = os.path.join(base_settings["out_dir"], "training_stats.yml")
 		with open(training_stats_file, "w") as f:
 			yaml.dump(stats, f)
 
 
 if __name__ == "__main__":
-	if len(sys.argv) == 2:
-		filename = sys.argv[1]
+	if len(sys.argv) == 3:
+		basic_config = sys.argv[1]
+		batch_config = sys.argv[2]
 	else:
 		# filename = "settings-reinforce-1.csv"
-		filename = "settings-new.yml"
-	main(filename)
+		basic_config = "settings-new.yml"
+		batch_config = None
+	main(basic_config, batch_config)

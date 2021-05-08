@@ -72,3 +72,11 @@ class MultiAgent(Agent):
 			self.active_role = "receiver"
 		else:
 			self.active_role = "sender"
+
+	def load(self, name: str):
+		self.components["sender"].load_weights(f"{name}.snd.weights")
+		self.components["receiver"].load_weights(f"{name}.rcv.weights")
+
+	def save(self, name: str):
+		self.components["sender"].save_weights(f"{name}.snd.weights")
+		self.components["receiver"].save_weights(f"{name}.rcv.weights")
