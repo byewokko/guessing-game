@@ -13,6 +13,8 @@ early_stopping_minimum: 15000
 #role_mode: static
 role_mode: switch
 
+shared_embedding: yes
+
 sender_type: agnostic
 #sender_type: informed
 
@@ -21,7 +23,7 @@ algorithm: reinforce
 
 #############
 # REINFORCE settings
-temperature: 10
+temperature: 30
 
 #############
 # Q Learning settings

@@ -37,7 +37,7 @@ def run_one(
 		memory_sampling_mode, algorithm, max_memory,
 		exploration_start, exploration_decay, exploration_floor,
 		early_stopping_patience, early_stopping_minimum,
-		role_mode,
+		role_mode, shared_embedding,
 		**kwargs
 ):
 	# TODO: refactor into settings parser
@@ -101,15 +101,23 @@ def run_one(
 		raise ValueError(f"Expected 'reinforce' or 'qlearning' algorithm, got '{algorithm}'")
 
 	if role_mode == "switch":
-		sender = MultiAgent(active_role="sender", **sender_settings)
-		receiver = MultiAgent(active_role="sender", **receiver_settings)
+		agent1 = MultiAgent(
+			active_role="sender",
+			shared_embedding=shared_embedding,
+			**sender_settings
+		)
+		agent2 = MultiAgent(
+			active_role="receiver",
+			shared_embedding=shared_embedding,
+			**receiver_settings
+		)
 	elif role_mode == "static":
-		sender = Sender(**sender_settings)
-		receiver = Receiver(**receiver_settings)
+		agent1 = Sender(**sender_settings)
+		agent2 = Receiver(**receiver_settings)
 	else:
 		raise ValueError(f"Role mode must be either 'static' or 'switch', not '{role_mode}'")
 
-	metrics = "episode images symbol guess success sender_loss receiver_loss".split(" ")
+	metrics = "episode role_setting images symbol guess success sender_loss receiver_loss".split(" ")
 	dtypes = [
 		pd.Int32Dtype(), object, pd.Int32Dtype(), pd.Int32Dtype(),
 		pd.Float64Dtype(), pd.Float64Dtype(), pd.Float64Dtype()
@@ -123,7 +131,11 @@ def run_one(
 		patience=early_stopping_patience,
 		min_episodes=early_stopping_minimum
 	)
-	batch_log = {metric: [] for metric in metrics}
+
+	sender = agent1
+	receiver = agent2
+	role_setting = 0
+
 	while episode < number_of_episodes:
 		batch_log = {metric: [] for metric in metrics}
 		while True:
@@ -168,8 +180,8 @@ def run_one(
 				reward=np.asarray([receiver_reward])
 			)
 
-			# TODO: MULTIAGENT logging and stats
 			batch_log["episode"].append(episode)
+			batch_log["role_setting"].append(role_setting)
 			batch_log["images"].append(img_ids)
 			batch_log["symbol"].append(sender_action)
 			batch_log["guess"].append(receiver_action)
@@ -196,8 +208,10 @@ def run_one(
 		)
 
 		if role_mode == "switch":
-			Sender.switch_role()
-			Receiver.switch_role()
+			sender.switch_role()
+			receiver.switch_role()
+			sender, receiver = receiver, sender
+			role_setting ^= 1
 
 		if early_stopping.check(episode, stats["mean_success"]):
 			break
@@ -265,26 +279,29 @@ def compute_live_stats(training_log: pd.DataFrame, analysis_window, overwrite_li
 def run_many(settings_list, name):
 	stats_file = f"{name}.stats.csv"
 	for settings in settings_list:
-		timestamp = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
-		folder = os.path.join("models", f"{name}-{timestamp}")
-		os.makedirs(folder)
-		settings["out_dir"] = folder
-		training_log: pd.DataFrame = run_one(**settings)
-		# save training_data to training_data_file
-		training_log_file = os.path.join(folder, "training_log.csv")
-		training_log.to_csv(training_log_file)
-		# compute stats
-		stats = compute_final_stats(training_log)
-		# append stats to stats_file
-		entry = OrderedDict()
-		entry.update(settings)
-		entry.update(stats)
-		# create header if stats_file is not initzd
-		if not os.path.isfile(stats_file):
-			with open(stats_file, "w") as f:
-				print(",".join(entry.keys()), file=f)
-		with open(stats_file, "a") as f:
-			print(",".join(entry.values()), file=f)
+		try:
+			timestamp = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
+			folder = os.path.join("models", f"{name}-{timestamp}")
+			os.makedirs(folder)
+			settings["out_dir"] = folder
+			training_log: pd.DataFrame = run_one(**settings)
+			# save training_data to training_data_file
+			training_log_file = os.path.join(folder, "training_log.csv")
+			training_log.to_csv(training_log_file)
+			# compute stats
+			stats = compute_final_stats(training_log)
+			# append stats to stats_file
+			entry = OrderedDict()
+			entry.update(settings)
+			entry.update(stats)
+			# create header if stats_file is not initzd
+			if not os.path.isfile(stats_file):
+				with open(stats_file, "w") as f:
+					print(",".join(entry.keys()), file=f)
+			with open(stats_file, "a") as f:
+				print(",".join(entry.values()), file=f)
+		except Exception as e:
+			print(e)
 
 
 def main(filename):

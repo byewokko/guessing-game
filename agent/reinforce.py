@@ -169,11 +169,24 @@ class Receiver(agent.Agent):
 
 
 class MultiAgent(agent.MultiAgent):
-	def __init__(self, active_role, **kwargs):
+	def __init__(self, active_role, shared_embedding, **kwargs):
 		super().__init__(active_role, **kwargs)
+		if shared_embedding:
+			image_embedding_layer = layers.Dense(
+				kwargs["embedding_size"],
+				name="shared_image_embedding"
+			)
+		else:
+			image_embedding_layer = None
 		self.components = {
-			"sender": Sender(**kwargs),
-			"receiver": Receiver(**kwargs)
+			"sender": Sender(
+				image_embedding_layer=image_embedding_layer,
+				**kwargs
+			),
+			"receiver": Receiver(
+				image_embedding_layer=image_embedding_layer,
+				**kwargs
+			)
 		}
 		if active_role not in ("sender", "receiver"):
 			raise ValueError(f"Role must be either 'sender' or 'receiver', not '{active_role}'.")
