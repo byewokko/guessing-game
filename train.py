@@ -281,29 +281,30 @@ def run_many(settings_list, name, base_settings=None):
 	for settings in settings_list:
 		actual_settings = base_settings.copy()
 		actual_settings.update(settings)
+		timestamp = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
+		folder = os.path.join("models", f"{name}-{timestamp}")
+		os.makedirs(folder)
+		actual_settings["out_dir"] = folder
 		try:
-			timestamp = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
-			folder = os.path.join("models", f"{name}-{timestamp}")
-			os.makedirs(folder)
-			actual_settings["out_dir"] = folder
 			training_log: pd.DataFrame = run_one(**actual_settings)
-			# save training_data to training_data_file
-			training_log_file = os.path.join(folder, "training_log.csv")
-			training_log.to_csv(training_log_file)
-			# compute stats
-			stats = compute_final_stats(training_log)
-			# append stats to stats_file
-			entry = OrderedDict()
-			entry.update(actual_settings)
-			entry.update(stats)
-			# create header if stats_file is not initzd
-			if not os.path.isfile(stats_file):
-				with open(stats_file, "w") as f:
-					print(",".join(entry.keys()), file=f)
-			with open(stats_file, "a") as f:
-				print(",".join(entry.values()), file=f)
 		except Exception as e:
 			print(e)
+			continue
+		# save training_data to training_data_file
+		training_log_file = os.path.join(folder, "training_log.csv")
+		training_log.to_csv(training_log_file)
+		# compute stats
+		stats = compute_final_stats(training_log)
+		# append stats to stats_file
+		entry = OrderedDict()
+		entry.update(actual_settings)
+		entry.update(stats)
+		# create header if stats_file is not initzd
+		if not os.path.isfile(stats_file):
+			with open(stats_file, "w") as f:
+				print(",".join(entry.keys()), file=f)
+		with open(stats_file, "a") as f:
+			print(",".join(map(str, entry.values())), file=f)
 
 
 def main(basic_config_file, batch_config_file):
