@@ -1,3 +1,5 @@
+from utils.set_seed import set_seed
+
 import datetime
 import os
 
@@ -10,6 +12,10 @@ import pandas as pd
 
 import tensorflow.keras.optimizers as optim
 import tensorflow.keras
+
+
+class TrainingError(RuntimeError):
+	pass
 
 
 class EarlyStopping:
@@ -38,6 +44,7 @@ def run_one(
 		exploration_start, exploration_decay, exploration_floor,
 		early_stopping_patience, early_stopping_minimum,
 		role_mode, shared_embedding,
+		seed,
 		**kwargs
 ):
 	# TODO: refactor into settings parser
@@ -132,37 +139,46 @@ def run_one(
 		min_episodes=early_stopping_minimum
 	)
 
+	set_seed(seed)
+
 	sender = agent1
 	receiver = agent2
 	role_setting = 0
 
+	exit_status = "full"
+	error = False
 	while episode < number_of_episodes:
 		batch_log = {metric: [] for metric in metrics}
 		while True:
 			episode += 1
 			game.reset()
 
-			# Sender turn
-			sender_state, img_ids = game.get_sender_state(
-				n_images=number_of_images,
-				unique_categories=True,
-				expand=True,
-				return_ids=True
-			)
-			sender_probs = np.squeeze(sender.predict(
-				state=sender_state
-			))
-			sender_action = sender.choose_action(sender_probs)
+			try:
+				# Sender turn
+				sender_state, img_ids = game.get_sender_state(
+					n_images=number_of_images,
+					unique_categories=True,
+					expand=True,
+					return_ids=True
+				)
+				sender_probs = np.squeeze(sender.predict(
+					state=sender_state
+				))
+				sender_action = sender.choose_action(sender_probs)
 
-			# Receiver turn
-			receiver_state = game.get_receiver_state(
-				sender_action,
-				expand=True
-			)
-			receiver_probs = np.squeeze(receiver.predict(
-				state=receiver_state
-			))
-			receiver_action = receiver.choose_action(receiver_probs)
+				# Receiver turn
+				receiver_state = game.get_receiver_state(
+					sender_action,
+					expand=True
+				)
+				receiver_probs = np.squeeze(receiver.predict(
+					state=receiver_state
+				))
+				receiver_action = receiver.choose_action(receiver_probs)
+			except Exception as e:
+				print("\n", e)
+				error = True
+				break
 
 			# Evaluate turn and remember
 			sender_reward, receiver_reward, success = game.evaluate_guess(receiver_action)
@@ -196,11 +212,16 @@ def run_one(
 
 			if episode % batch_size == 0:
 				break
-
+		if error:
+			return training_log, "error"
 		# Train on batch
-		batch_log["sender_loss"] = sender.update_on_batch(batch_size, memory_sampling_mode=memory_sampling_mode)
-		batch_log["receiver_loss"] = receiver.update_on_batch(batch_size, memory_sampling_mode=memory_sampling_mode)
-		training_log = training_log.append(pd.DataFrame(batch_log))
+		try:
+			batch_log["sender_loss"] = sender.update_on_batch(batch_size, memory_sampling_mode=memory_sampling_mode)
+			batch_log["receiver_loss"] = receiver.update_on_batch(batch_size, memory_sampling_mode=memory_sampling_mode)
+			training_log = training_log.append(pd.DataFrame(batch_log))
+		except Exception as e:
+			print("\n", e)
+			return training_log, "error"
 
 		stats = compute_live_stats(
 			training_log=training_log,
@@ -214,19 +235,22 @@ def run_one(
 			role_setting ^= 1
 
 		if early_stopping.check(episode, stats["mean_success"]):
+			exit_status = "early"
 			break
+	print()
 	agent1.save(os.path.join(out_dir, "agent1"))
 	agent2.save(os.path.join(out_dir, "agent2"))
 
-	return training_log
+	return training_log, exit_status
 
 
-def compute_final_stats(training_log, analysis_window=None):
+def compute_final_stats(training_log, exit_status="full", analysis_window=None):
 	if not analysis_window:
 		analysis_window = 30
 	final_episode = training_log.iloc[-1]["episode"]
 	tail = training_log.tail(analysis_window)
 	stats = {
+		"exit_status": exit_status,
 		"final_episode": training_log.iloc[-1]["episode"],
 		"mean_success": tail["success"].mean()
 	}
@@ -285,8 +309,11 @@ def run_many(settings_list, name, base_settings=None):
 		folder = os.path.join("models", f"{name}-{timestamp}")
 		os.makedirs(folder)
 		actual_settings["out_dir"] = folder
+		settings_file = os.path.join(folder, "settings.yml")
+		with open(settings_file, "w") as f:
+			yaml.dump(actual_settings, f)
 		try:
-			training_log: pd.DataFrame = run_one(**actual_settings)
+			training_log, exit_status = run_one(**actual_settings)
 		except Exception as e:
 			print(e)
 			continue
@@ -294,7 +321,7 @@ def run_many(settings_list, name, base_settings=None):
 		training_log_file = os.path.join(folder, "training_log.csv")
 		training_log.to_csv(training_log_file)
 		# compute stats
-		stats = compute_final_stats(training_log)
+		stats = compute_final_stats(training_log, exit_status)
 		# append stats to stats_file
 		entry = OrderedDict()
 		entry.update(actual_settings)
@@ -310,6 +337,7 @@ def run_many(settings_list, name, base_settings=None):
 def main(basic_config_file, batch_config_file):
 	with open(basic_config_file, "r") as f:
 		base_settings = yaml.load(f)
+
 	if batch_config_file:
 		# RUN MANY
 		# parse csv into a list of settings-dicts
@@ -327,6 +355,9 @@ def main(basic_config_file, batch_config_file):
 	else:
 		# RUN ONE
 		# parse yaml into a settings-dict
+		settings_file = os.path.join(base_settings["out_dir"], "settings.yml")
+		with open(settings_file, "w") as f:
+			yaml.dump(base_settings, f)
 		training_log = run_one(**base_settings)
 		training_log_file = os.path.join(base_settings["out_dir"], "training_log.csv")
 		training_log.to_csv(training_log_file)

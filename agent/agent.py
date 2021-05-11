@@ -54,9 +54,11 @@ class Agent:
 		return loss
 
 	def load(self, name: str):
+		print(f"Loading weights from {name}")
 		self.model.load_weights(name)
 
 	def save(self, name: str):
+		print(f"Saving weights to {name}")
 		self.model.save_weights(name)
 
 

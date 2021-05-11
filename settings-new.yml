@@ -1,17 +1,19 @@
+seed: 1
 out_dir: models
 dataset: data/big/mcrae-wordnet-vgg16.32bit
+#dataset: data/big/imagenet-200x65-vgg19.train.emb.gz
 number_of_episodes: 30000
 batch_size: 30
 number_of_images: 2
 embedding_size: 50
 vocabulary_size: 50
-optimizer: adam
-analysis_window: 30
+optimizer: sgd
+analysis_window: 20
 early_stopping_patience: 5000
 early_stopping_minimum: 15000
 
-#role_mode: static
-role_mode: switch
+role_mode: static
+#role_mode: switch
 
 shared_embedding: yes
 
@@ -34,5 +36,5 @@ memory_sampling_mode: last
 #memory_sampling_mode: linear_skew
 
 exploration_start: 1
-exploration_decay: 0.995
-exploration_floor: 0.01
+exploration_decay: 0.999
+exploration_floor: 0.005
