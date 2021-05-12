@@ -92,12 +92,16 @@ class Game:
             sender_state = [np.expand_dims(item, axis=0) for item in sender_state]
         return sender_state
 
-    def get_receiver_state_from_ids(self, ids, correct_pos, expand=True):
+    def get_receiver_state_from_ids(self, ids, correct_pos, sender_action, expand=True):
         self.correct_pos_receiver = correct_pos
-        sender_state = self.images[ids]
+        receiver_images = self.images[ids]
         if expand:
-            sender_state = [np.expand_dims(item, axis=0) for item in sender_state]
-        return sender_state
+            sender_action = np.asarray([sender_action])
+        receiver_state = [*receiver_images, sender_action]
+
+        if expand:
+            receiver_state = [np.expand_dims(item, axis=0) for item in receiver_state]
+        return receiver_state
 
     def get_sender_state(self, n_images=2, unique_categories=True, return_ids=False, expand=True):
         if unique_categories and self.categories is not None:

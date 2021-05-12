@@ -68,16 +68,18 @@ def run_one(
 	learning_rate = 0.1
 	optimizers = {
 		"adam": optim.Adam,
-		"sgd": optim.SGD
+		"sgd": optim.SGD,
+		"adadelta": optim.Adadelta,
+		"rmsprop": optim.RMSprop
 	}
 
-	sender_settings = {
+	agent_settings = {
 		"n_images": number_of_images,
 		"input_image_shape": image_shape,
 		"embedding_size": embedding_size,
 		"vocabulary_size": vocabulary_size,
 		"temperature": temperature,
-		"optimizer": optimizers[optimizer](learning_rate),
+		"optimizer": optimizers[optimizer](lr=learning_rate),
 		"sender_type": sender_type,
 		#     "sender_type": "informed",
 		#     "n_informed_filters": 20,
@@ -85,18 +87,6 @@ def run_one(
 		"exploration_start": exploration_start,
 		"exploration_decay": exploration_decay,
 		"exploration_floor": exploration_floor
-	}
-	receiver_settings = {
-		"n_images": number_of_images,
-		"input_image_shape": image_shape,
-		"embedding_size": embedding_size,
-		"vocabulary_size": vocabulary_size,
-		"temperature": temperature,
-		"optimizer": optimizers[optimizer](learning_rate),
-		"max_memory": max_memory,
-		"exploration_start": exploration_start,
-		"exploration_decay": exploration_decay,
-		"exploration_floor": exploration_floor,
 	}
 
 	tensorflow.keras.backend.clear_session()
@@ -111,22 +101,22 @@ def run_one(
 		agent1 = MultiAgent(
 			active_role="sender",
 			shared_embedding=shared_embedding,
-			**sender_settings
+			**agent_settings
 		)
 		agent2 = MultiAgent(
 			active_role="receiver",
 			shared_embedding=shared_embedding,
-			**receiver_settings
+			**agent_settings
 		)
 	elif role_mode == "static":
-		agent1 = Sender(**sender_settings)
-		agent2 = Receiver(**receiver_settings)
+		agent1 = Sender(**agent_settings)
+		agent2 = Receiver(**agent_settings)
 	else:
 		raise ValueError(f"Role mode must be either 'static' or 'switch', not '{role_mode}'")
 
 	metrics = "episode role_setting images symbol guess success sender_loss receiver_loss".split(" ")
 	dtypes = [
-		pd.Int32Dtype(), object, pd.Int32Dtype(), pd.Int32Dtype(),
+		pd.Int32Dtype(), bool, object, pd.Int32Dtype(), pd.Int32Dtype(),
 		pd.Float64Dtype(), pd.Float64Dtype(), pd.Float64Dtype()
 	]
 	training_log = pd.DataFrame(columns=metrics)
@@ -246,7 +236,7 @@ def run_one(
 
 def compute_final_stats(training_log, exit_status="full", analysis_window=None):
 	if not analysis_window:
-		analysis_window = 30
+		analysis_window = 200
 	final_episode = training_log.iloc[-1]["episode"]
 	tail = training_log.tail(analysis_window)
 	stats = {
@@ -358,10 +348,11 @@ def main(basic_config_file, batch_config_file):
 		settings_file = os.path.join(base_settings["out_dir"], "settings.yml")
 		with open(settings_file, "w") as f:
 			yaml.dump(base_settings, f)
-		training_log = run_one(**base_settings)
+		training_log, exit_status = run_one(**base_settings)
 		training_log_file = os.path.join(base_settings["out_dir"], "training_log.csv")
 		training_log.to_csv(training_log_file)
 		stats = compute_final_stats(training_log)
+		stats["exit_status"] = exit_status
 		training_stats_file = os.path.join(base_settings["out_dir"], "training_stats.yml")
 		with open(training_stats_file, "w") as f:
 			yaml.dump(stats, f)

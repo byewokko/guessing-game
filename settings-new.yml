@@ -7,8 +7,8 @@ batch_size: 30
 number_of_images: 2
 embedding_size: 50
 vocabulary_size: 50
-optimizer: sgd
-analysis_window: 20
+optimizer: adam
+analysis_window: 30
 early_stopping_patience: 5000
 early_stopping_minimum: 15000
 
@@ -25,7 +25,7 @@ algorithm: reinforce
 
 #############
 # REINFORCE settings
-temperature: 30
+temperature: 10
 
 #############
 # Q Learning settings
