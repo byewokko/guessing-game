@@ -62,7 +62,7 @@ class Game:
         self.episode += 1
         return success
 
-    def generate_games(self, n_games, n_images=2, unique_categories=False):
+    def generate_games(self, n_games, n_images=2, unique_categories=True):
         games = []
         for g in range(n_games):
             if unique_categories and self.categories is not None:
