@@ -62,7 +62,44 @@ class Game:
         self.episode += 1
         return success
 
-    def get_sender_state(self, n_images=2, unique_categories=False, return_ids=False, expand=False):
+    def generate_games(self, n_games, n_images=2, unique_categories=False):
+        games = []
+        for g in range(n_games):
+            if unique_categories and self.categories is not None:
+                sample_ctgs = np.random.choice(a=self.categories, size=n_images, replace=False)
+                sender_ids = np.zeros(n_images, dtype="int32")
+                for i in range(n_images):
+                    sender_ids[i] = np.random.choice(self.categorized_images[sample_ctgs[i]], size=1)
+            else:
+                sender_ids = np.random.choice(a=self.image_ids, size=n_images, replace=False)
+            correct_id = sender_ids[0]
+
+            receiver_ids = np.copy(sender_ids)
+            np.random.shuffle(receiver_ids)
+
+            correct_pos_receiver = np.where(receiver_ids == correct_id)[0]
+
+            games.append({
+                "sender_ids": sender_ids,
+                "receiver_ids": receiver_ids,
+                "receiver_pos": correct_pos_receiver,
+            })
+        return games
+
+    def get_sender_state_from_ids(self, ids, expand=True):
+        sender_state = self.images[ids]
+        if expand:
+            sender_state = [np.expand_dims(item, axis=0) for item in sender_state]
+        return sender_state
+
+    def get_receiver_state_from_ids(self, ids, correct_pos, expand=True):
+        self.correct_pos_receiver = correct_pos
+        sender_state = self.images[ids]
+        if expand:
+            sender_state = [np.expand_dims(item, axis=0) for item in sender_state]
+        return sender_state
+
+    def get_sender_state(self, n_images=2, unique_categories=True, return_ids=False, expand=True):
         if unique_categories and self.categories is not None:
             self.sample_ctgs = np.random.choice(a=self.categories, size=n_images, replace=False)
             self.sample_ids = np.zeros(n_images, dtype="int32")
