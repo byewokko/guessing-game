@@ -49,10 +49,19 @@ def run_one(
 ):
 	# TODO: refactor into settings parser
 	# LOAD DATASET
-	from utils.dataprep import load_emb_pickled
-	metadata, embeddings = load_emb_pickled(dataset)
-	filenames = metadata.get("fnames")
-	categories = metadata.get("categories")
+	loaded = False
+	try:
+		from utils.dataprep import load_emb_pickled
+		metadata, embeddings = load_emb_pickled(dataset)
+		filenames = metadata.get("fnames")
+		categories = metadata.get("categories")
+		loaded = True
+	except FileNotFoundError:
+		loaded = False
+	if not loaded:
+		from utils.dataprep import load_emb_gz, make_categories
+		_, filenames, embeddings = load_emb_gz(dataset)
+		categories = make_categories(filenames, sep="\\")
 	image_shape = [len(embeddings[0])]
 
 	# CREATE GAME
@@ -67,10 +76,13 @@ def run_one(
 	# SET UP AGENTS
 	learning_rate = 0.1
 	optimizers = {
-		"adam": optim.Adam,
-		"sgd": optim.SGD,
-		"adadelta": optim.Adadelta,
-		"rmsprop": optim.RMSprop
+		"adam": (optim.Adam, {
+			# "amsgrad": True,
+			"clipnorm": 1.0
+		}),
+		"sgd": (optim.SGD, {"clipnorm": 1.0}),
+		"adadelta": (optim.Adadelta, {"clipnorm": 1.0}),
+		"rmsprop": (optim.RMSprop, {"clipnorm": 1.0})
 	}
 
 	agent_settings = {
@@ -79,7 +91,7 @@ def run_one(
 		"embedding_size": embedding_size,
 		"vocabulary_size": vocabulary_size,
 		"temperature": temperature,
-		"optimizer": optimizers[optimizer](lr=learning_rate),
+		"optimizer": optimizers[optimizer][0](lr=learning_rate, **optimizers[optimizer][1]),
 		"sender_type": sender_type,
 		#     "sender_type": "informed",
 		#     "n_informed_filters": 20,
@@ -136,7 +148,6 @@ def run_one(
 	role_setting = 0
 
 	exit_status = "full"
-	error = False
 	while episode < number_of_episodes:
 		batch_log = {metric: [] for metric in metrics}
 		while True:
@@ -167,7 +178,7 @@ def run_one(
 				receiver_action = receiver.choose_action(receiver_probs)
 			except Exception as e:
 				print("\n", e)
-				error = True
+				exit_status = "error"
 				break
 
 			# Evaluate turn and remember
@@ -199,11 +210,16 @@ def run_one(
 					analysis_window=500,
 					overwrite_line=False
 				)
+				if early_stopping.check(episode, stats["mean_success"]):
+					exit_status = "early"
+					break
 
 			if episode % batch_size == 0:
 				break
-		if error:
+		if exit_status == "error":
 			return training_log, "error"
+		elif exit_status == "early":
+			break
 		# Train on batch
 		try:
 			batch_log["sender_loss"] = sender.update_on_batch(batch_size, memory_sampling_mode=memory_sampling_mode)
@@ -224,9 +240,6 @@ def run_one(
 			sender, receiver = receiver, sender
 			role_setting ^= 1
 
-		if early_stopping.check(episode, stats["mean_success"]):
-			exit_status = "early"
-			break
 	print()
 	agent1.save(os.path.join(out_dir, "agent1"))
 	agent2.save(os.path.join(out_dir, "agent2"))
@@ -241,7 +254,7 @@ def compute_final_stats(training_log, exit_status="full", analysis_window=None):
 	tail = training_log.tail(analysis_window)
 	stats = {
 		"exit_status": exit_status,
-		"final_episode": training_log.iloc[-1]["episode"],
+		"final_episode": final_episode,
 		"mean_success": tail["success"].mean()
 	}
 	frequent_symbols = tail["symbol"].value_counts(normalize=True)
@@ -297,16 +310,17 @@ def run_many(settings_list, name, base_settings=None):
 		actual_settings.update(settings)
 		timestamp = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
 		folder = os.path.join("models", f"{name}-{timestamp}")
-		os.makedirs(folder)
+		if not os.path.isdir(folder):
+			os.makedirs(folder)
 		actual_settings["out_dir"] = folder
 		settings_file = os.path.join(folder, "settings.yml")
 		with open(settings_file, "w") as f:
 			yaml.dump(actual_settings, f)
-		try:
-			training_log, exit_status = run_one(**actual_settings)
-		except Exception as e:
-			print(e)
-			continue
+		# try:
+		training_log, exit_status = run_one(**actual_settings)
+		# except Exception as e:
+		# 	print(e)
+		# 	continue
 		# save training_data to training_data_file
 		training_log_file = os.path.join(folder, "training_log.csv")
 		training_log.to_csv(training_log_file)
@@ -364,6 +378,6 @@ if __name__ == "__main__":
 		batch_config = sys.argv[2]
 	else:
 		# filename = "settings-reinforce-1.csv"
-		basic_config = "settings-new.yml"
-		batch_config = None
+		basic_config = "settings-train.yml"
+		batch_config = "e1initial-smalldataset.csv"
 	main(basic_config, batch_config)

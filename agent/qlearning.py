@@ -72,6 +72,8 @@ def build_sender_model(
 		y = vocabulary_filter(y)
 		y = flatten(y)
 
+	# y = layers.Activation("relu")(y)
+	# y = layers.Dense(vocabulary_size)(y)
 	y = layers.Activation("softmax")(y)
 
 	model_predict = models.Model(image_inputs, y, name="S_predict")
@@ -109,6 +111,8 @@ def build_receiver_model(
 	y_symbol = symbol_embedding(symbol_input)
 	y = [dot_product([img, y_symbol]) for img in y_images]
 	y = layers.concatenate(y, axis=-1)
+	# y = layers.Activation("relu")(y)
+	# y = layers.Dense(len(image_inputs))(y)
 	y = layers.Activation("softmax")(y)
 
 	model_predict = models.Model([*image_inputs, symbol_input], y, name="R_predict")

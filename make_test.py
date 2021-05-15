@@ -39,7 +39,7 @@ if __name__ == "__main__":
 	if len(sys.argv) == 2:
 		config = sys.argv[1]
 	else:
-		config = "settings-make-games.yml"
+		config = "settings-make-test.yml"
 	with open(config, "r") as f:
 		settings = yaml.load(f)
 	main(**settings)

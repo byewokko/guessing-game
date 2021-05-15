@@ -1,0 +1,4 @@
+vocabulary_size,sender_type,number_of_images
+10,agnostic,6
+50,agnostic,6
+100,agnostic,6
