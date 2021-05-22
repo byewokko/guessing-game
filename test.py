@@ -20,7 +20,7 @@ def create_agents(
 		*,
 		image_shape, number_of_images, embedding_size, vocabulary_size, sender_type,
 		temperature, optimizer, algorithm, max_memory, exploration_decay, exploration_floor,
-		role_mode, shared_embedding,
+		role_mode, shared_embedding, role_alteration=False,
 		**kwargs
 ):
 	# SET UP AGENTS
@@ -55,23 +55,27 @@ def create_agents(
 		raise ValueError(f"Expected 'reinforce' or 'qlearning' algorithm, got '{algorithm}'")
 
 	if role_mode == "switch":
-		agent1 = MultiAgent(
+		sender = MultiAgent(
 			active_role="sender",
 			shared_embedding=shared_embedding,
 			**agent_settings
 		)
-		agent2 = MultiAgent(
+		receiver = MultiAgent(
 			active_role="receiver",
 			shared_embedding=shared_embedding,
 			**agent_settings
 		)
+		if role_alteration:
+			sender.switch_role()
+			receiver.switch_role()
+			sender, receiver = receiver, sender
 	elif role_mode == "static":
-		agent1 = Sender(**agent_settings)
-		agent2 = Receiver(**agent_settings)
+		sender = Sender(**agent_settings)
+		receiver = Receiver(**agent_settings)
 	else:
 		raise ValueError(f"Role mode must be either 'static' or 'switch', not '{role_mode}'")
 
-	return agent1, agent2
+	return sender, receiver
 
 
 def run_one(
@@ -176,9 +180,8 @@ def compute_final_stats(training_log, exit_status="full", analysis_window=None):
 	return stats
 
 
-def run_many(test_path, dataset, model_path, model_folders, out_name, seed=None):
+def run_many(test_path, dataset, model_path, model_folders, out_name, role_alteration, seed=None):
 	stats_file = f"{out_name}.results.csv"
-
 	# LOAD DATASET
 	from utils.dataprep import load_emb_pickled
 	metadata, embeddings = load_emb_pickled(dataset)
@@ -200,12 +203,12 @@ def run_many(test_path, dataset, model_path, model_folders, out_name, seed=None)
 		test = pickle.load(f)
 
 	for folder in model_folders:
-		settings_path = os.path.join(model_path, folder, "dump/settings.yml")
+		settings_path = os.path.join(model_path, folder, "settings.yml")
 		print(f"Loading model from {settings_path}")
 		with open(settings_path) as f:
 			settings = yaml.safe_load(f)
 		settings["image_shape"] = image_shape
-		agent1, agent2 = create_agents(**settings)
+		agent1, agent2 = create_agents(role_alteration=role_alteration, **settings)
 		try:
 			agent1.load(os.path.join(model_path, folder, "agent1"))
 			agent2.load(os.path.join(model_path, folder, "agent2"))
