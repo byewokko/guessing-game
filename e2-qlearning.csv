@@ -1,0 +1,7 @@
+vocabulary_size,sender_type,algorithm,seed
+10,agnostic,qlearning,1
+50,agnostic,qlearning,1
+100,agnostic,qlearning,1
+10,agnostic,qlearning,22
+50,agnostic,qlearning,22
+100,agnostic,qlearning,22

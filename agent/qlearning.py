@@ -35,7 +35,7 @@ def build_sender_model(
 		)
 
 	# agnostic part
-	sigmoid = layers.Activation("sigmoid", name="S_sigmoid")
+	activation = layers.Activation("sigmoid", name="S_sigmoid")
 	output_layer = layers.Dense(vocabulary_size, name="S_output")
 
 	# informed part
@@ -45,7 +45,6 @@ def build_sender_model(
 		filters=vocabulary_size,
 		kernel_size=(1,),
 		input_shape=[n_images, embedding_size],
-		activation="sigmoid",
 		data_format="channels_last",
 		name="S_feature_filters"
 	)
@@ -62,22 +61,23 @@ def build_sender_model(
 	y = [image_embedding_layer(x) for x in image_inputs]
 	if sender_type == "agnostic":
 		y = layers.concatenate(y, axis=-1)
-		y = layers.Activation("sigmoid")(y)
+		y = activation(y)
 		y = output_layer(y)
 	elif sender_type == "informed":
 		y = stack(y)
 		y = permute(y)
 		y = feature_filters(y)
+		y = activation(y)
 		y = permute_2(y)
 		y = vocabulary_filter(y)
 		y = flatten(y)
 
 	# y = layers.Activation("relu")(y)
 	# y = layers.Dense(vocabulary_size)(y)
-	y = layers.Activation("softmax")(y)
+	y = layers.Activation("sigmoid")(y)
 
 	model_predict = models.Model(image_inputs, y, name="S_predict")
-	model_predict.compile(loss=losses.categorical_crossentropy, optimizer=optimizer)
+	model_predict.compile(loss=losses.binary_crossentropy, optimizer=optimizer)
 
 	if verbose:
 		model_predict.summary()
@@ -113,10 +113,10 @@ def build_receiver_model(
 	y = layers.concatenate(y, axis=-1)
 	# y = layers.Activation("relu")(y)
 	# y = layers.Dense(len(image_inputs))(y)
-	y = layers.Activation("softmax")(y)
+	y = layers.Activation("sigmoid")(y)
 
 	model_predict = models.Model([*image_inputs, symbol_input], y, name="R_predict")
-	model_predict.compile(loss=losses.categorical_crossentropy, optimizer=optimizer)
+	model_predict.compile(loss=losses.binary_crossentropy, optimizer=optimizer)
 
 	if verbose:
 		model_predict.summary()

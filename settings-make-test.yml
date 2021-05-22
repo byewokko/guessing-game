@@ -1,5 +1,5 @@
 seed: 1
-out_path: test-games.pkl
+out_path: 5000games-6img.pkl
 dataset: data/big/mcrae-wordnet-vgg16.32bit
-number_of_games: 1000
-number_of_images: 2
+number_of_games: 5000
+number_of_images: 6

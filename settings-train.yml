@@ -1,32 +1,34 @@
-seed: 2
+seed: 1
 out_dir: models
-#dataset: data/big/mcrae-wordnet-vgg16.32bit
-dataset: data/small-mcrae-wordnet-vgg16.32bit
+dataset: data/big/mcrae-wordnet-vgg16.32bit
+#dataset: data/small-mcrae-wordnet-vgg16.32bit
 #dataset: data/imagenet-200x65-vgg19.train.emb.gz
-number_of_episodes: 30000
+number_of_episodes: 40000
 batch_size: 30
 number_of_images: 2
 embedding_size: 50
 vocabulary_size: 50
 optimizer: adam
 analysis_window: 30
-early_stopping_patience: 5000
-early_stopping_minimum: 15000
+early_stopping_patience: 8000
+early_stopping_minimum: 20000
 
 role_mode: static
 #role_mode: switch
 
 shared_embedding: yes
 
+shared_experience: no
+
 sender_type: agnostic
 #sender_type: informed
 
-#algorithm: reinforce
-algorithm: qlearning
+algorithm: reinforce
+#algorithm: qlearning
 
 #############
 # REINFORCE settings
-temperature: 50
+temperature: 10
 
 #############
 # Q Learning settings

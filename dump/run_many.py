@@ -1,8 +1,6 @@
 import pandas as pd
 import sys, os
 import yaml
-import csv
-from datetime import datetime
 
 import run
 
@@ -34,7 +32,7 @@ def main():
         for k in experiment_args:
             if type(experiment_args[k]).__module__ == "numpy":
                 experiment_args[k] = experiment_args[k].item()
-        with open("temp.yml", "w") as f:
+        with open("../temp.yml", "w") as f:
             yaml.safe_dump(experiment_args, f, indent=4)
         # results_summary = run.run(**experiment_args)
         try:

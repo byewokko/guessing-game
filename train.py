@@ -43,10 +43,11 @@ def run_one(
 		memory_sampling_mode, algorithm, max_memory,
 		exploration_start, exploration_decay, exploration_floor,
 		early_stopping_patience, early_stopping_minimum,
-		role_mode, shared_embedding,
+		role_mode, shared_embedding, shared_experience,
 		seed,
 		**kwargs
 ):
+	CHECKPOINT_EVERY = 1000
 	# TODO: refactor into settings parser
 	# LOAD DATASET
 	loaded = False
@@ -147,11 +148,23 @@ def run_one(
 	receiver = agent2
 	role_setting = 0
 
+	next_checkpoint_episode = CHECKPOINT_EVERY
+	error_encountered = False
+	remaining_errors = 5
 	exit_status = "full"
 	while episode < number_of_episodes:
 		batch_log = {metric: [] for metric in metrics}
 		while True:
 			episode += 1
+			if error_encountered:
+				error_encountered = False
+				try:
+					print(f"Loading checkpoint")
+					agent1.load(os.path.join(out_dir, "agent1"))
+					agent2.load(os.path.join(out_dir, "agent2"))
+				except:
+					pass
+
 			game.reset()
 
 			try:
@@ -178,8 +191,12 @@ def run_one(
 				receiver_action = receiver.choose_action(receiver_probs)
 			except Exception as e:
 				print("\n", e)
-				exit_status = "error"
-				break
+				error_encountered = True
+				remaining_errors -= 1
+				if remaining_errors < 0:
+					exit_status = "error"
+					break
+				continue
 
 			# Evaluate turn and remember
 			sender_reward, receiver_reward, success = game.evaluate_guess(receiver_action)
@@ -189,13 +206,26 @@ def run_one(
 				action_probs=sender_probs,
 				reward=np.asarray([sender_reward])
 			)
-			# print(np.asarray([sender_action]), np.asarray([receiver_action]), np.asarray([sender_reward]))
 			receiver.remember(
 				state=receiver_state,
 				action=np.asarray([receiver_action]),
 				action_probs=receiver_probs,
 				reward=np.asarray([receiver_reward])
 			)
+
+			if role_mode == "switch" and shared_experience:
+				receiver.components["sender"].remember(
+					state=sender_state,
+					action=np.asarray([sender_action]),
+					action_probs=sender_probs,
+					reward=np.asarray([sender_reward])
+				)
+				sender.components["receiver"].remember(
+					state=receiver_state,
+					action=np.asarray([receiver_action]),
+					action_probs=receiver_probs,
+					reward=np.asarray([receiver_reward])
+				)
 
 			batch_log["episode"].append(episode)
 			batch_log["role_setting"].append(role_setting)
@@ -217,11 +247,19 @@ def run_one(
 			if episode % batch_size == 0:
 				break
 		if exit_status == "error":
-			return training_log, "error"
-		elif exit_status == "early":
 			break
+		if exit_status == "early":
+			break
+
 		# Train on batch
 		try:
+			# Save before updating
+			if episode > next_checkpoint_episode:
+				agent1.save(os.path.join(out_dir, "agent1"))
+				agent2.save(os.path.join(out_dir, "agent2"))
+				next_checkpoint_episode += CHECKPOINT_EVERY
+
+			# Update
 			batch_log["sender_loss"] = sender.update_on_batch(batch_size, memory_sampling_mode=memory_sampling_mode)
 			batch_log["receiver_loss"] = receiver.update_on_batch(batch_size, memory_sampling_mode=memory_sampling_mode)
 			training_log = training_log.append(pd.DataFrame(batch_log))
@@ -241,8 +279,9 @@ def run_one(
 			role_setting ^= 1
 
 	print()
-	agent1.save(os.path.join(out_dir, "agent1"))
-	agent2.save(os.path.join(out_dir, "agent2"))
+	if exit_status != "error":
+		agent1.save(os.path.join(out_dir, "agent1"))
+		agent2.save(os.path.join(out_dir, "agent2"))
 
 	return training_log, exit_status
 
@@ -304,7 +343,7 @@ def compute_live_stats(training_log: pd.DataFrame, analysis_window, overwrite_li
 
 
 def run_many(settings_list, name, base_settings=None):
-	stats_file = f"{name}.stats.csv"
+	stats_file = os.path.join("models", f"{name}.stats.csv")
 	for settings in settings_list:
 		actual_settings = base_settings.copy()
 		actual_settings.update(settings)
@@ -326,6 +365,9 @@ def run_many(settings_list, name, base_settings=None):
 		training_log.to_csv(training_log_file)
 		# compute stats
 		stats = compute_final_stats(training_log, exit_status)
+		final_stats_file = os.path.join(folder, "final_stats.yaml")
+		with open(final_stats_file, "w") as f:
+			yaml.dump(stats, f)
 		# append stats to stats_file
 		entry = OrderedDict()
 		entry.update(actual_settings)

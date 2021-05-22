@@ -1,0 +1,13 @@
+vocabulary_size,sender_type,temperature,seed
+50,agnostic,10,1
+50,agnostic,10,22
+50,agnostic,50,1
+50,agnostic,50,22
+50,agnostic,5,1
+50,agnostic,5,22
+50,informed,10,1
+50,informed,10,22
+50,informed,50,1
+50,informed,50,22
+50,informed,5,1
+50,informed,5,22

@@ -1,0 +1,7 @@
+vocabulary_size,sender_type,temperature,number_of_images
+10,informed,10,4
+50,informed,10,4
+100,informed,10,4
+10,informed,50,4
+50,informed,50,4
+100,informed,50,4

@@ -200,14 +200,18 @@ def run_many(test_path, dataset, model_path, model_folders, out_name, seed=None)
 		test = pickle.load(f)
 
 	for folder in model_folders:
-		settings_path = os.path.join(model_path, folder, "settings.yml")
+		settings_path = os.path.join(model_path, folder, "dump/settings.yml")
 		print(f"Loading model from {settings_path}")
 		with open(settings_path) as f:
 			settings = yaml.safe_load(f)
 		settings["image_shape"] = image_shape
 		agent1, agent2 = create_agents(**settings)
-		agent1.load(os.path.join(model_path, folder, "agent1"))
-		agent2.load(os.path.join(model_path, folder, "agent2"))
+		try:
+			agent1.load(os.path.join(model_path, folder, "agent1"))
+			agent2.load(os.path.join(model_path, folder, "agent2"))
+		except Exception as e:
+			print(f"Cannot load agents: {e}")
+			continue
 
 		print(f"Testing model {folder}")
 		test_log, exit_status = run_one(agent1, agent2, game, test, seed)

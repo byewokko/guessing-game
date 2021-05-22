@@ -102,7 +102,7 @@ def run(
             agent2.save(f"{save_path}.02")
             learning_curves.to_csv(f"{save_path}.curves.csv")
         print(results_summary)
-        with open(f"temp.yml", "r") as f:
+        with open(f"../temp.yml", "r") as f:
             experiment_args = yaml.safe_load(f)
         experiment_args["load_file"] = save_file
         experiment_args["mode"] = "test"
@@ -122,6 +122,6 @@ if __name__ == "__main__":
         settings_file = SETTINGS_FILE
     with open(settings_file, "r") as f:
         experiment_args = yaml.safe_load(f)
-    with open("temp.yml", "w") as f:
+    with open("../temp.yml", "w") as f:
         yaml.safe_dump(experiment_args, f, indent=4)
     run(**experiment_args)

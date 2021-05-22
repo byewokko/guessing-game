@@ -1,0 +1,13 @@
+vocabulary_size,sender_type,temperature,number_of_images
+10,agnostic,10,4
+50,agnostic,10,4
+100,agnostic,10,4
+10,agnostic,10,6
+50,agnostic,10,6
+100,agnostic,10,6
+10,agnostic,50,4
+50,agnostic,50,4
+100,agnostic,50,4
+10,agnostic,50,6
+50,agnostic,50,6
+100,agnostic,50,6
