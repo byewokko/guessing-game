@@ -48,6 +48,7 @@ def run_one(
 		**kwargs
 ):
 	CHECKPOINT_EVERY = 1000
+	ERROR_PATIENCE = 5
 	# TODO: refactor into settings parser
 	# LOAD DATASET
 	loaded = False
@@ -150,7 +151,7 @@ def run_one(
 
 	next_checkpoint_episode = CHECKPOINT_EVERY
 	error_encountered = False
-	remaining_errors = 5
+	remaining_errors = ERROR_PATIENCE
 	exit_status = "full"
 	while episode < number_of_episodes:
 		batch_log = {metric: [] for metric in metrics}
