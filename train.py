@@ -49,6 +49,7 @@ def run_one(
 ):
 	CHECKPOINT_EVERY = 1000
 	ERROR_PATIENCE = 5
+
 	# TODO: refactor into settings parser
 	# LOAD DATASET
 	loaded = False
@@ -103,6 +104,9 @@ def run_one(
 		"exploration_floor": exploration_floor
 	}
 
+	if role_mode != "switch":
+		shared_experience = False
+
 	tensorflow.keras.backend.clear_session()
 	if algorithm == "reinforce":
 		from agent.reinforce import Sender, Receiver, MultiAgent
@@ -129,6 +133,9 @@ def run_one(
 		raise ValueError(f"Role mode must be either 'static' or 'switch', not '{role_mode}'")
 
 	metrics = "episode role_setting images symbol guess success sender_loss receiver_loss".split(" ")
+	if shared_experience:
+		metrics.extend(["sender_loss_2", "receiver_loss_2"])
+
 	dtypes = [
 		pd.Int32Dtype(), bool, object, pd.Int32Dtype(), pd.Int32Dtype(),
 		pd.Float64Dtype(), pd.Float64Dtype(), pd.Float64Dtype()
@@ -214,7 +221,7 @@ def run_one(
 				reward=np.asarray([receiver_reward])
 			)
 
-			if role_mode == "switch" and shared_experience:
+			if shared_experience:
 				receiver.components["sender"].remember(
 					state=sender_state,
 					action=np.asarray([sender_action]),
@@ -263,6 +270,16 @@ def run_one(
 			# Update
 			batch_log["sender_loss"] = sender.update_on_batch(batch_size, memory_sampling_mode=memory_sampling_mode)
 			batch_log["receiver_loss"] = receiver.update_on_batch(batch_size, memory_sampling_mode=memory_sampling_mode)
+			if shared_experience:
+				batch_log["sender_loss_2"] = receiver.components["sender"].update_on_batch(
+					batch_size,
+					memory_sampling_mode=memory_sampling_mode
+				)
+				batch_log["receiver_loss_2"] = sender.components["receiver"].update_on_batch(
+					batch_size,
+					memory_sampling_mode=memory_sampling_mode
+				)
+
 			training_log = training_log.append(pd.DataFrame(batch_log))
 		except Exception as e:
 			print("\n", e)
@@ -422,5 +439,6 @@ if __name__ == "__main__":
 	else:
 		# filename = "settings-reinforce-1.csv"
 		basic_config = "settings-train.yml"
-		batch_config = "e1initial-smalldataset.csv"
+		# batch_config = "e1initial-smalldataset.csv"
+		batch_config = None
 	main(basic_config, batch_config)

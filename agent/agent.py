@@ -68,12 +68,15 @@ class MultiAgent(Agent):
 		if active_role not in ("sender", "receiver"):
 			raise ValueError(f"Role must be either 'sender' or 'receiver', not '{active_role}'.")
 		self.active_role = active_role
+		self.inactive_role = "receiver" if active_role == "sender" else "sender"
 
 	def switch_role(self):
 		if self.active_role == "sender":
 			self.active_role = "receiver"
+			self.inactive_role = "sender"
 		else:
 			self.active_role = "sender"
+			self.inactive_role = "receiver"
 
 	def load(self, name: str):
 		self.components["sender"].load_weights(f"{name}.snd.weights")

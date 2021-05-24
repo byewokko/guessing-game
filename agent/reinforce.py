@@ -192,12 +192,6 @@ class MultiAgent(agent.MultiAgent):
 			raise ValueError(f"Role must be either 'sender' or 'receiver', not '{active_role}'.")
 		self.active_role = active_role
 
-	def switch_role(self):
-		if self.active_role == "sender":
-			self.active_role = "receiver"
-		else:
-			self.active_role = "sender"
-
 	def predict(self, state):
 		return self.components[self.active_role].predict(state)
 
