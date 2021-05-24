@@ -13,12 +13,12 @@ analysis_window: 30
 early_stopping_patience: 8000
 early_stopping_minimum: 20000
 
-role_mode: static
-#role_mode: switch
+#role_mode: static
+role_mode: switch
 
 shared_embedding: yes
 
-shared_experience: no
+shared_experience: yes
 
 sender_type: agnostic
 #sender_type: informed
@@ -28,7 +28,7 @@ algorithm: reinforce
 
 #############
 # REINFORCE settings
-temperature: 10
+temperature: 50
 
 #############
 # Q Learning settings

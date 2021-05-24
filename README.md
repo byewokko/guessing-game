@@ -31,11 +31,15 @@ Some basic pivot tables and tSNE clustering is available in
 
 ## TODOs
 
-- [x] refactor train procedure
-- [x] reimplement reinforce agent
-- [ ] reimplement Q-agent
-  - [ ] fix training/predicting input
-- [ ] reimplement Compound Agent
+- [ ] pick the best one from each setting, move to sep folder
+- [ ] test the best on the regular testset
+- [ ] test the best on the same-synset testset
+- [ ] cluster analysis of test output
+- [ ] symbol purity of test output
+- [ ] cluster analysis of embedding layer
+
+
+  
 - analysis
   - [ ] TSNE / the other thing
   - [ ] symbol purity

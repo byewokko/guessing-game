@@ -1,0 +1,4 @@
+vocabulary_size,role_mode,number_of_images,temperature,shared_experience,seed
+50,switch,2,50,yes,1
+50,switch,2,50,yes,22
+50,switch,2,50,yes,333
