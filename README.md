@@ -31,6 +31,7 @@ Some basic pivot tables and tSNE clustering is available in
 
 ## TODOs
 
+- [ ] plot the 6switch models
 - [ ] pick the best one from each setting, move to sep folder
 - [ ] test the best on the regular testset
 - [ ] test the best on the same-synset testset
