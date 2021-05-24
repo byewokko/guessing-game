@@ -37,10 +37,6 @@ Some basic pivot tables and tSNE clustering is available in
 - [ ] cluster analysis of test output
 - [ ] symbol purity of test output
 - [ ] cluster analysis of embedding layer
+- [ ] qualitative analysis of clusters
 
-
-  
-- analysis
-  - [ ] TSNE / the other thing
-  - [ ] symbol purity
     
