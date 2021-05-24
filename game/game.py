@@ -62,14 +62,17 @@ class Game:
         self.episode += 1
         return success
 
-    def generate_games(self, n_games, n_images=2, unique_categories=True):
+    def generate_games(self, n_games, n_images=2, game_type="different_synset"):
         games = []
         for g in range(n_games):
-            if unique_categories and self.categories is not None:
+            if game_type == "different_synset":
                 sample_ctgs = np.random.choice(a=self.categories, size=n_images, replace=False)
                 sender_ids = np.zeros(n_images, dtype="int32")
                 for i in range(n_images):
                     sender_ids[i] = np.random.choice(self.categorized_images[sample_ctgs[i]], size=1)
+            elif game_type == "same_synset":
+                sample_ctg = np.random.choice(a=self.categories)
+                sender_ids = np.random.choice(self.categorized_images[sample_ctg], size=n_images, replace=False)
             else:
                 sender_ids = np.random.choice(a=self.image_ids, size=n_images, replace=False)
             correct_id = sender_ids[0]

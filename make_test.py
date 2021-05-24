@@ -4,7 +4,7 @@ import sys
 from utils.set_seed import set_seed
 
 
-def make_games(dataset, number_of_images, number_of_games, seed=None):
+def make_games(dataset, number_of_images, number_of_games, game_type, seed=None):
 	# LOAD DATASET
 	from utils.dataprep import load_emb_pickled
 	metadata, embeddings = load_emb_pickled(dataset)
@@ -24,7 +24,7 @@ def make_games(dataset, number_of_images, number_of_games, seed=None):
 	if seed is not None:
 		set_seed(seed)
 
-	return game.generate_games(number_of_games, number_of_images, True)
+	return game.generate_games(number_of_games, number_of_images, game_type)
 
 
 def main(out_path, **kwargs):
