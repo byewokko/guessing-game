@@ -104,8 +104,6 @@ def run_one(
 
 	batch_log = {metric: [] for metric in metrics}
 	for test in testset:
-		if not episode % 200:
-			print(f"\r{episode} games played", end="")
 		episode += 1
 		game.reset()
 
@@ -148,6 +146,9 @@ def run_one(
 		batch_log["symbol"].append(sender_action)
 		batch_log["guess"].append(receiver_action)
 		batch_log["success"].append(success)
+
+		if not episode % 200:
+			print(f"\r{episode} games played", end="")
 
 	test_log = test_log.append(pd.DataFrame(batch_log))
 	if error:
