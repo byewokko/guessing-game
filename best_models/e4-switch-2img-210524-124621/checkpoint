@@ -1,0 +1,2 @@
+model_checkpoint_path: "agent2.rcv"
+all_model_checkpoint_paths: "agent2.rcv"

@@ -1,5 +1,5 @@
 seed: 1
-model_path: top-models
+model_path: best_models
 model_folders: |
   e3-6images-210523-031950
   e4-switch-6img-210524-200612
