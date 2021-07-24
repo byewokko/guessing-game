@@ -1,7 +1,0 @@
-vocabulary_size,sender_type
-10,agnostic
-50,agnostic
-100,agnostic
-10,informed
-50,informed
-100,informed

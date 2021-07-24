@@ -4,6 +4,11 @@ import sys
 from utils.set_seed import set_seed
 
 
+"""
+Pre-generate a set of testing games
+"""
+
+
 def make_games(dataset, number_of_images, number_of_games, game_type, seed=None):
 	# LOAD DATASET
 	from utils.dataprep import load_emb_pickled

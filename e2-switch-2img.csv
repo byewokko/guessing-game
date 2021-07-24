@@ -1,7 +1,0 @@
-vocabulary_size,sender_type,temperature
-10,agnostic,10
-50,agnostic,10
-100,agnostic,10
-10,agnostic,50
-50,agnostic,50
-100,agnostic,50

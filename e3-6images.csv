@@ -1,7 +1,0 @@
-vocabulary_size,sender_type,number_of_images,temperature,seed
-50,agnostic,6,30,1
-50,agnostic,6,60,1
-50,agnostic,6,100,1
-50,agnostic,6,30,22
-50,agnostic,6,60,22
-50,agnostic,6,100,22
